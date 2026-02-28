@@ -34,7 +34,11 @@ class Embedder(ABC):
 
 class VectorStore(ABC):
     @abstractmethod
-    def upsert_chunks(self, chunks: Sequence[DocumentChunk], vectors: Sequence[Sequence[float]]) -> None:
+    def upsert_chunks(
+        self,
+        chunks: Sequence[DocumentChunk],
+        vectors: Sequence[Sequence[float]],
+    ) -> None:
         """Insert or update chunk vectors in the index."""
 
     @abstractmethod

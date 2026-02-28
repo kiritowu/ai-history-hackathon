@@ -128,30 +128,24 @@ curl -X POST "http://127.0.0.1:8000/v1/ask" \
 - Optional:
   - `GCP_PROJECT=<your-project-id>`
 
+## Local SSO PDF Scraper
+
+The standalone scraper has been moved out of backend and now lives in `scraper/`.
+See `scraper/README.md` for setup and run instructions.
+
 ## Weaviate Configuration
 
 - Weaviate Cloud:
   - `WEAVIATE_URL=https://<cluster-id>.weaviate.network`
   - `WEAVIATE_API_KEY=<your-api-key>`
   - `WEAVIATE_COLLECTION=DocumentChunk`
-
-## Embedding Configuration
-
-- Local default:
-  - `EMBEDDING_BACKEND=local_sentence_transformer`
-  - `EMBEDDING_MODEL_ID=BAAI/bge-m3`
-- Cloud vLLM embedding service:
-  - `EMBEDDING_BACKEND=openai_compatible`
-  - `EMBEDDING_API_BASE_URL=https://<embed-service-url>/v1`
-  - `EMBEDDING_API_MODEL=BAAI/bge-m3`
-  - `EMBEDDING_API_KEY=EMPTY` (or your gateway key)
+- Embeddings are generated externally by the backend embedder and upserted with vectors.
 
 ## Cloud Run Deployment (vLLM)
 
-This repo includes scripts/config to deploy two services on Cloud Run:
+This repo includes scripts/config to deploy OCR service on Cloud Run:
 
 - OCR service: `PaddlePaddle/PaddleOCR-VL-1.5`
-- Embedding service: `BAAI/bge-m3`
 
 ### Deploy Steps
 
@@ -163,22 +157,19 @@ cp deploy/cloudrun/env.sh.example deploy/cloudrun/env.sh
 
 2. Edit `deploy/cloudrun/env.sh` with project/region and sizing.
 
-3. Deploy both services:
+3. Deploy OCR service with your Cloud Run deploy script:
 
 ```bash
-bash deploy/cloudrun/scripts/deploy-all.sh
+# Example:
+# bash deploy/cloudrun/scripts/<your-ocr-deploy-script>.sh
 ```
 
-The script prints OCR and embedding service URLs.
+The script prints the OCR service URL.
 
 ### Cloud Validation
 
 ```bash
 curl "${OCR_SERVICE_URL}/v1/models"
-curl "${EMBED_SERVICE_URL}/v1/models"
-curl "${EMBED_SERVICE_URL}/v1/embeddings" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"BAAI/bge-m3","input":"hello world"}'
 ```
 
 ### App Env for Cloud Inference
@@ -189,11 +180,6 @@ Set these in your app `.env` after deployment:
 PADDLEOCR_VL_SERVER_URL=${OCR_SERVICE_URL}/v1
 PADDLEOCR_VL_BACKEND=vllm-server
 PADDLEOCR_VL_API_MODEL_NAME=PaddlePaddle/PaddleOCR-VL-1.5
-
-EMBEDDING_BACKEND=openai_compatible
-EMBEDDING_API_BASE_URL=${EMBED_SERVICE_URL}/v1
-EMBEDDING_API_MODEL=BAAI/bge-m3
-EMBEDDING_API_KEY=EMPTY
 ```
 
 ## Tests

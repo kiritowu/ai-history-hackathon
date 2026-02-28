@@ -54,7 +54,11 @@ class WeaviateVectorStore(VectorStore):
             ],
         )
 
-    def upsert_chunks(self, chunks: Sequence[DocumentChunk], vectors: Sequence[Sequence[float]]) -> None:
+    def upsert_chunks(
+        self,
+        chunks: Sequence[DocumentChunk],
+        vectors: Sequence[Sequence[float]],
+    ) -> None:
         client = self._connect()
         collection = client.collections.get(self._collection_name)
 

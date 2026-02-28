@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     paddleocr_vl_server_url: str = "http://127.0.0.1:8111/"
     paddleocr_vl_backend: str = "mlx-vlm-server"
     paddleocr_vl_api_model_name: str = "PaddlePaddle/PaddleOCR-VL-1.5"
+    ocr_backend: str = "paddle_vl_server"
+    vlm_ocr_base_url: str = "https://usehovrapp--vllm-server-serve.modal.run"
+    vlm_ocr_model: str = "PaddlePaddle/PaddleOCR-VL"
+    vlm_ocr_api_key: str = "pass123"
+    vlm_ocr_task_prompt: str = "OCR:"
+    vlm_ocr_timeout_seconds: float = 600.0
+    vlm_ocr_pdf_dpi: int = 200
 
     embedding_backend: str = "local_sentence_transformer"
     embedding_model_id: str = "BAAI/bge-m3"

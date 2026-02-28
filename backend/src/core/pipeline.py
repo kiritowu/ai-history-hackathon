@@ -239,7 +239,12 @@ class RagPipeline:
         history: list[ChatTurn] | None = None,
     ) -> tuple[str, list[RetrievalHit]]:
         query_vector = self._embedder.embed_texts([question])[0]
-        hits = self._vector_store.search(query_vector=query_vector, top_k=top_k, doc_id=doc_id, doc_ids=doc_ids)
+        hits = self._vector_store.search(
+            query_vector=query_vector,
+            top_k=top_k,
+            doc_id=doc_id,
+            doc_ids=doc_ids,
+        )
         context = build_context(hits)
         answer = self._chat_service.answer(
             question=question,
