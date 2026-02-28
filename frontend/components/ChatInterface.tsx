@@ -1,304 +1,204 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Send, Upload, Sparkles, FileText, CheckCircle2 } from "lucide-react"
-import ReactMarkdown from "react-markdown"
+import { useState } from "react"
+import { FileText, Sparkles } from "lucide-react"
+
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai/conversation"
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai/message"
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  type PromptInputMessage,
+} from "@/components/ai/prompt-input"
+import { Source, Sources, SourcesContent, SourcesTrigger } from "@/components/ai/sources"
+import { Suggestion, Suggestions } from "@/components/ai/suggestion"
 import { performRAG, type Citation } from "@/lib/rag"
 
-interface Message {
+const suggestions = [
+  "How did Singapore become a major trading port?",
+  "What role did the East India Company play in Singapore's trade?",
+  "What were Singapore's key commodities in the 19th century?",
+  "How did the rubber and tin trade shape Singapore's economy?",
+  "What was the impact of the Suez Canal on Singapore's trade routes?",
+  "How did entrepôt trade define Singapore's early growth?",
+]
+
+type Status = "ready" | "submitted" | "streaming" | "error"
+
+interface ChatMessage {
   id: string
   role: "user" | "assistant"
   content: string
   citations?: Citation[]
 }
 
-export function ChatInterface() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [uploadedDocs, setUploadedDocs] = useState<string[]>([])
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+interface ChatInterfaceProps {
+  onConversationStart?: () => void
+}
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [text, setText] = useState("")
+  const [status, setStatus] = useState<Status>("ready")
+  const handleSend = async (question: string) => {
+    if (!question.trim() || status !== "ready") return
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  const handleSendMessage = async () => {
-    if (!input.trim()) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
       role: "user",
-      content: input,
+      content: question,
     }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput("")
-    setIsLoading(true)
+    setMessages((prev) => {
+      if (prev.length === 0) onConversationStart?.()
+      return [...prev, userMessage]
+    })
+    setText("")
+    setStatus("submitted")
 
     try {
       const ragResponse = await performRAG(
-        input,
-        messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        }))
+        question,
+        messages.map((m) => ({ role: m.role, content: m.content }))
       )
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: ragResponse.answer,
-        citations: ragResponse.citations,
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: ragResponse.answer,
+          citations: ragResponse.citations,
+        },
+      ])
     } catch (error) {
       console.error("Error sending message:", error)
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "Sorry, there was an error processing your question. Please try again.",
-      }
-      setMessages((prev) => [...prev, errorMessage])
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            "Sorry, there was an error processing your question. Please try again.",
+        },
+      ])
     } finally {
-      setIsLoading(false)
+      setStatus("ready")
     }
   }
 
-  const handleDocumentUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const files = event.target.files
-    if (!files) return
-
-    for (const file of Array.from(files)) {
-      const formData = new FormData()
-      formData.append("file", file)
-
-      try {
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        })
-
-        const data = await response.json()
-        setUploadedDocs((prev) => [...prev, data.documentId])
-      } catch (error) {
-        console.error("Error uploading document:", error)
-      }
-    }
+  const handleSubmit = (message: PromptInputMessage) => {
+    if (!message.text?.trim()) return
+    handleSend(message.text)
   }
 
   return (
-    <div className="flex flex-col h-full gap-0 bg-gradient-to-br from-background via-background to-purple-50/5 dark:to-purple-950/10 rounded-2xl border border-border overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col bg-background overflow-hidden">
       {/* Header */}
-      <div className="px-8 py-6 border-b border-border bg-white/30 dark:bg-white/5 backdrop-blur-sm">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 dark:from-purple-500 dark:to-pink-500 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <h2 className="text-2xl font-bold gradient-text">AI Research Assistant</h2>
+      <div className="shrink-0 border-b border-border px-6 py-4">
+        <div className="mb-1 flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-purple-500" />
+          <h2 className="text-xl font-semibold">AI Research Assistant</h2>
         </div>
-        <p className="text-sm text-muted-foreground ml-13">Ask questions about your documents and discover insights</p>
+        <p className="text-sm text-muted-foreground">
+          Ask questions about AI history and get cited answers.
+        </p>
       </div>
 
-      {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto space-y-6 px-8 py-6">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-6 max-w-md">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 dark:from-purple-500/30 dark:to-pink-500/30 flex items-center justify-center border border-purple-500/30 dark:border-purple-500/20">
-                <FileText className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-foreground mb-2">Welcome to AI History Research</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  Upload documents about AI history and ask intelligent questions. Get context-aware answers with citations from your sources.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((message) => (
-              <div key={message.id} className="flex gap-4">
-                {/* Avatar */}
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mt-1">
-                  {message.role === "assistant" ? (
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 dark:from-purple-500 dark:to-pink-500 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-white" />
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 dark:from-cyan-400 dark:to-blue-500 flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">You</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Message Content */}
-                <div className="flex-1 space-y-3">
-                  {/* Message Bubble */}
-                  <div
-                    className={`inline-block max-w-xl ${
-                      message.role === "assistant"
-                        ? "bg-white/60 dark:bg-white/5 backdrop-blur-md border border-white/40 dark:border-white/10"
-                        : "bg-gradient-to-r from-cyan-500/80 to-blue-600/80 dark:from-cyan-500/70 dark:to-blue-600/70"
-                    } rounded-2xl px-6 py-4 shadow-sm dark:shadow-md`}
-                  >
-                    <div
-                      className={`text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none ${
-                        message.role === "assistant"
-                          ? "text-foreground"
-                          : "text-white"
-                      }`}
-                    >
-                      <ReactMarkdown
-                        components={{
-                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                          ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>,
-                          li: ({ children }) => <li className="mb-1">{children}</li>,
-                          strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                          em: ({ children }) => <em className="italic">{children}</em>,
-                          code: ({ children }) => (
-                            <code className="bg-black/10 dark:bg-black/30 px-2 py-1 rounded text-xs font-mono">
-                              {children}
-                            </code>
-                          ),
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-
-                  {/* Citations */}
-                  {message.citations && message.citations.length > 0 && (
-                    <div className="space-y-2 pt-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        Sources
-                      </p>
-                      <div className="space-y-2">
-                        {message.citations.map((citation, i) => (
-                          <div
-                            key={i}
-                            className="bg-white/40 dark:bg-white/5 backdrop-blur-sm border border-white/30 dark:border-white/10 rounded-lg p-3 text-xs space-y-1"
-                          >
-                            <div className="flex items-start gap-2">
-                              <CheckCircle2 className="w-3 h-3 mt-0.5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="font-semibold text-foreground">
-                                  {citation.documentName}
-                                  {citation.pageNumber && ` (p. ${citation.pageNumber})`}
-                                </p>
-                                {citation.content && (
-                                  <p className="text-muted-foreground mt-1 line-clamp-2">
-                                    {citation.content.substring(0, 150)}...
-                                  </p>
-                                )}
-                                <p className="text-muted-foreground/60 mt-1">
-                                  Relevance: {(citation.score * 100).toFixed(0)}%
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Loading State */}
-            {isLoading && (
-              <div className="flex gap-4">
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 dark:from-purple-500 dark:to-pink-500 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <div className="flex-1 bg-white/60 dark:bg-white/5 backdrop-blur-md border border-white/40 dark:border-white/10 rounded-2xl px-6 py-4">
-                  <div className="flex gap-2">
-                    <div className="w-2 h-2 bg-purple-600 dark:bg-purple-400 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-pink-600 dark:bg-pink-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.1s" }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-cyan-600 dark:bg-cyan-400 rounded-full animate-bounce"
-                      style={{ animationDelay: "0.2s" }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
-
-      {/* Upload Status */}
-      {uploadedDocs.length > 0 && (
-        <div className="px-8 py-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5 border-t border-border">
-          <div className="flex items-center gap-2 text-sm font-medium text-green-700 dark:text-green-400">
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-            <span>
-              {uploadedDocs.length} document{uploadedDocs.length !== 1 ? "s" : ""} indexed and ready
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div className="p-6 border-t border-border bg-white/30 dark:bg-white/5 backdrop-blur-sm space-y-4">
-        {/* File Upload */}
-        <div className="flex items-center gap-2">
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              multiple
-              accept=".pdf,.txt,.md,.docx"
-              onChange={handleDocumentUpload}
-              className="hidden"
+      {/* Conversation */}
+      <Conversation className="min-h-0 flex-1">
+        <ConversationContent>
+          {messages.length === 0 ? (
+            <ConversationEmptyState
+              className="flex-1"
+              title="Ask a Question"
+              description="Ask questions about AI history to get grounded answers with source citations."
+              icon={<FileText className="h-6 w-6" />}
             />
-            <div className="p-2.5 hover:bg-white/60 dark:hover:bg-white/10 rounded-xl transition-colors inline-block text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 border border-transparent hover:border-white/20">
-              <Upload className="w-5 h-5" />
-            </div>
-          </label>
-          <span className="text-xs text-muted-foreground">Upload documents (PDF, TXT, MD, DOCX)</span>
-        </div>
+          ) : (
+            messages.map((msg) => (
+              <Message key={msg.id} from={msg.role}>
+                {msg.role === "assistant" && msg.citations && msg.citations.length > 0 && (
+                  <Sources>
+                    <SourcesTrigger count={msg.citations.length} />
+                    <SourcesContent>
+                      {msg.citations.map((c, i) => (
+                        <Source
+                          key={`${c.documentName}-${i}`}
+                          title={
+                            c.pageNumber
+                              ? `${c.documentName} (p. ${c.pageNumber})`
+                              : c.documentName
+                          }
+                        />
+                      ))}
+                    </SourcesContent>
+                  </Sources>
+                )}
+                <MessageContent>
+                  {msg.role === "assistant" ? (
+                    <MessageResponse>{msg.content}</MessageResponse>
+                  ) : (
+                    <p>{msg.content}</p>
+                  )}
+                </MessageContent>
+              </Message>
+            ))
+          )}
 
-        {/* Message Input */}
-        <div className="flex gap-3">
-          <Input
-            placeholder="Ask a question about your documents..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                handleSendMessage()
-              }
-            }}
-            disabled={isLoading}
-            className="input-modern text-sm"
-          />
-          <Button
-            onClick={handleSendMessage}
-            disabled={isLoading || !input.trim()}
-            size="lg"
-            className="button-primary px-6 h-12 flex-shrink-0 shadow-lg shadow-purple-500/30 dark:shadow-purple-500/20 hover:shadow-xl hover:shadow-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
+          {status === "submitted" && (
+            <Message from="assistant">
+              <MessageContent>
+                <p className="text-sm text-muted-foreground animate-pulse">
+                  Thinking...
+                </p>
+              </MessageContent>
+            </Message>
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
+
+      {/* Suggestions + Prompt input */}
+      <div className="shrink-0 space-y-3 border-t border-border px-4 py-4">
+        {messages.length === 0 && (
+          <Suggestions className="px-0">
+            {suggestions.map((s) => (
+              <Suggestion
+                key={s}
+                suggestion={s}
+                onClick={(suggestion) => handleSend(suggestion)}
+              />
+            ))}
+          </Suggestions>
+        )}
+        <PromptInput onSubmit={handleSubmit}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Ask a question about AI history..."
+            />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <div />
+            <PromptInputSubmit
+              disabled={!text.trim() || status !== "ready"}
+              status={status}
+            />
+          </PromptInputFooter>
+        </PromptInput>
       </div>
     </div>
   )
