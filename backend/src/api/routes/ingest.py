@@ -53,19 +53,15 @@ def create_router(
         pipeline: RagPipeline = Depends(pipeline_provider),
         pdf_ingest_source: PDFIngestSource = Depends(pdf_ingest_source_provider),
     ) -> BulkIngestResponseDTO:
-        gcs_uris: list[str] = list(request.gcs_uris or [])
-        if request.bucket_uri:
-            try:
-                listed_uris = pdf_ingest_source.list_gcs_uris(
-                    bucket_uri=request.bucket_uri,
-                    prefix=request.prefix,
-                    suffixes=tuple(request.file_suffixes) if request.file_suffixes else None,
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-            except Exception as exc:
-                raise HTTPException(status_code=500, detail=f"Failed to list bucket files: {exc}") from exc
-            gcs_uris.extend(listed_uris)
+        try:
+            gcs_uris = pdf_ingest_source.list_gcs_uris(
+                bucket_uri=request.bucket_uri,
+                suffixes=(".pdf",),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to list bucket files: {exc}") from exc
 
         if not gcs_uris:
             raise HTTPException(status_code=404, detail="No files found to ingest.")

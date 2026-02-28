@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class ChatTurnDTO(BaseModel):
@@ -43,19 +43,8 @@ class BulkIngestResponseDTO(BaseModel):
 
 
 class BulkIngestFromGCSRequestDTO(BaseModel):
-    gcs_uris: list[str] | None = None
-    bucket_uri: str | None = None
-    prefix: str = ""
+    bucket_uri: str = Field(min_length=6)
     batch_size: int = Field(default=10, ge=1, le=200)
-    file_suffixes: list[str] = Field(default_factory=lambda: [".pdf"])
-
-    @model_validator(mode="after")
-    def validate_sources(self) -> "BulkIngestFromGCSRequestDTO":
-        has_uris = bool(self.gcs_uris)
-        has_bucket = bool(self.bucket_uri)
-        if not has_uris and not has_bucket:
-            raise ValueError("Provide either gcs_uris or bucket_uri.")
-        return self
 
 
 class AskRequestDTO(BaseModel):
