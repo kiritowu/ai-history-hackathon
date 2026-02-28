@@ -31,11 +31,8 @@ def create_pipeline() -> RagPipeline:
         embedder = SentenceTransformerEmbedder(settings.embedding_model_id)
     vector_store = WeaviateVectorStore(
         collection_name=settings.weaviate_collection,
-        host=settings.weaviate_host,
-        http_port=settings.weaviate_http_port,
-        grpc_port=settings.weaviate_grpc_port,
-        cloud_url=settings.weaviate_cloud_url,
-        cloud_api_key=settings.weaviate_cloud_api_key,
+        cloud_url=settings.weaviate_url,
+        cloud_api_key=settings.weaviate_api_key,
     )
     chat = OpenAIChatService(
         api_key=settings.openai_api_key,

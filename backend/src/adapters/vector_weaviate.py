@@ -4,6 +4,7 @@ from typing import Sequence
 
 import weaviate
 from weaviate.classes.config import Configure, DataType, Property
+from weaviate.classes.init import Auth
 from weaviate.classes.query import Filter
 
 from core.interfaces import VectorStore
@@ -14,36 +15,25 @@ class WeaviateVectorStore(VectorStore):
     def __init__(
         self,
         collection_name: str,
-        host: str = "localhost",
-        http_port: int = 8080,
-        grpc_port: int = 50051,
-        cloud_url: str = "",
-        cloud_api_key: str = "",
+        cloud_url: str,
+        cloud_api_key: str,
     ) -> None:
         self._collection_name = collection_name
-        self._host = host
-        self._http_port = http_port
-        self._grpc_port = grpc_port
         self._cloud_url = cloud_url
         self._cloud_api_key = cloud_api_key
         self._client: weaviate.WeaviateClient | None = None
 
     def _connect(self) -> weaviate.WeaviateClient:
         if self._client is None:
-            if self._cloud_url:
-                auth_credentials = None
-                if self._cloud_api_key:
-                    auth_credentials = weaviate.auth.AuthApiKey(self._cloud_api_key)
-                self._client = weaviate.connect_to_weaviate_cloud(
-                    cluster_url=self._cloud_url,
-                    auth_credentials=auth_credentials,
-                )
-            else:
-                self._client = weaviate.connect_to_local(
-                    host=self._host,
-                    port=self._http_port,
-                    grpc_port=self._grpc_port,
-                )
+            if not self._cloud_url:
+                raise ValueError("WEAVIATE_URL is required for Weaviate Cloud.")
+            if not self._cloud_api_key:
+                raise ValueError("WEAVIATE_API_KEY is required for Weaviate Cloud.")
+
+            self._client = weaviate.connect_to_weaviate_cloud(
+                cluster_url=self._cloud_url,
+                auth_credentials=Auth.api_key(self._cloud_api_key),
+            )
             self._ensure_collection()
         return self._client
 

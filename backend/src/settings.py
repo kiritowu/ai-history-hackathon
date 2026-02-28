@@ -22,12 +22,9 @@ class Settings(BaseSettings):
     embedding_api_model: str = "BAAI/bge-m3"
     embedding_api_key: str = "EMPTY"
 
-    weaviate_host: str = "localhost"
-    weaviate_http_port: int = 8080
-    weaviate_grpc_port: int = 50051
     weaviate_collection: str = "DocumentChunk"
-    weaviate_cloud_url: str = ""
-    weaviate_cloud_api_key: str = ""
+    weaviate_url: str = ""
+    weaviate_api_key: str = ""
 
     gcp_project: str = ""
 
