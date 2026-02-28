@@ -1,0 +1,1 @@
+Use pnpm as your package manager, and typescript in the package.
