@@ -10,8 +10,8 @@ export async function getWeaviateClient() {
     const weaviateURL = process.env.WEAVIATE_URL as string
     const weaviateKey = process.env.WEAVIATE_API_KEY as string
 
-    if (!weaviateURL) {
-      throw new Error("WEAVIATE_URL environment variable not set")
+    if (!weaviateURL || !weaviateKey) {
+      throw new Error("WEAVIATE_URL and WEAVIATE_API_KEY environment variables not set")
     }
 
     try {
