@@ -96,9 +96,13 @@ class RagPipeline:
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
 
-    def _ingest_text_internal(self, text: str, source_name: str) -> IngestSuccess:
-        chunks = chunk_text(text, chunk_size=self._chunk_size, overlap=self._chunk_overlap)
-        if not chunks:
+    @staticmethod
+    def _normalize_chunks(chunks: Sequence[str]) -> list[str]:
+        return [" ".join(chunk.split()) for chunk in chunks if chunk and chunk.strip()]
+
+    def _index_chunks(self, chunks: Sequence[str], source_name: str, ocr_text: str) -> IngestSuccess:
+        normalized_chunks = self._normalize_chunks(chunks)
+        if not normalized_chunks:
             raise ValueError("No OCR text extracted from the provided document.")
 
         doc_id = str(uuid4())
@@ -110,7 +114,7 @@ class RagPipeline:
                 chunk_index=idx,
                 text=chunk,
             )
-            for idx, chunk in enumerate(chunks)
+            for idx, chunk in enumerate(normalized_chunks)
         ]
         vectors = self._embedder.embed_texts([chunk.text for chunk in chunk_models])
         self._vector_store.upsert_chunks(chunk_models, vectors)
@@ -118,16 +122,26 @@ class RagPipeline:
             source_name=source_name,
             doc_id=doc_id,
             chunk_count=len(chunk_models),
-            ocr_text=text,
+            ocr_text=ocr_text,
         )
+
+    def _ingest_text_internal(self, text: str, source_name: str) -> IngestSuccess:
+        chunks = chunk_text(text, chunk_size=self._chunk_size, overlap=self._chunk_overlap)
+        if not chunks:
+            raise ValueError("No OCR text extracted from the provided document.")
+        return self._index_chunks(chunks=chunks, source_name=source_name, ocr_text=text)
 
     def _ingest_image_internal(self, image: Image.Image, source_name: str) -> IngestSuccess:
         text = self._ocr_provider.extract_text(image)
         return self._ingest_text_internal(text=text, source_name=source_name)
 
     def _ingest_pdf_internal(self, pdf_bytes: bytes, source_name: str) -> IngestSuccess:
-        text = self._ocr_provider.extract_text_from_pdf_bytes(pdf_bytes)
-        return self._ingest_text_internal(text=text, source_name=source_name)
+        page_texts = self._ocr_provider.extract_text_pages_from_pdf_bytes(pdf_bytes)
+        normalized_page_texts = self._normalize_chunks(page_texts)
+        if not normalized_page_texts:
+            raise ValueError("No OCR text extracted from the provided document.")
+        full_text = "\n\n".join(normalized_page_texts)
+        return self._index_chunks(chunks=normalized_page_texts, source_name=source_name, ocr_text=full_text)
 
     def ingest_image(self, image: Image.Image, source_name: str) -> tuple[str, int, str]:
         result = self._ingest_image_internal(image=image, source_name=source_name)

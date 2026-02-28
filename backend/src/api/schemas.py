@@ -30,7 +30,6 @@ class IngestSuccessDTO(BaseModel):
 
 class IngestFromGCSRequestDTO(BaseModel):
     gcs_uri: str = Field(min_length=6)
-    source_name: str | None = None
 
 
 class IngestFailureDTO(BaseModel):

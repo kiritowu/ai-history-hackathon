@@ -77,6 +77,24 @@ class PaddleOCRVLServerProvider(OCRProvider):
                     collected_markdown.append(text)
         return "\n\n".join(collected_markdown).strip()
 
+    @staticmethod
+    def _extract_text_from_result(res: Any, temp_dir: Path, result_idx: int) -> str:
+        if hasattr(res, "save_to_markdown"):
+            before = set(temp_dir.glob("**/*.md"))
+            res.save_to_markdown(save_path=str(temp_dir / f"res_{result_idx}"))
+            after = set(temp_dir.glob("**/*.md"))
+            new_files = sorted(after - before)
+            markdown_parts = [md_file.read_text(encoding="utf-8").strip() for md_file in new_files]
+            markdown_text = "\n\n".join(part for part in markdown_parts if part).strip()
+            if markdown_text:
+                return markdown_text
+
+        fallback_lines: list[str] = []
+        if hasattr(res, "res"):
+            fallback_lines.extend(PaddleOCRVLServerProvider._collect_strings(getattr(res, "res")))
+        fallback_lines.extend(PaddleOCRVLServerProvider._collect_strings(res))
+        return "\n".join(fallback_lines).strip()
+
     def extract_text(self, image: Image.Image) -> str:
         self._ensure_loaded()
         assert self._pipeline is not None
@@ -99,6 +117,10 @@ class PaddleOCRVLServerProvider(OCRProvider):
             return "\n".join(fallback_lines).strip()
 
     def extract_text_from_pdf_bytes(self, pdf_bytes: bytes) -> str:
+        page_texts = self.extract_text_pages_from_pdf_bytes(pdf_bytes)
+        return "\n\n".join(page_texts).strip()
+
+    def extract_text_pages_from_pdf_bytes(self, pdf_bytes: bytes) -> list[str]:
         self._ensure_loaded()
         assert self._pipeline is not None
 
@@ -108,13 +130,9 @@ class PaddleOCRVLServerProvider(OCRProvider):
             pdf_path.write_bytes(pdf_bytes)
 
             results = list(self._pipeline.predict(str(pdf_path)))
-            markdown_text = self._read_markdown_outputs(results, temp_dir)
-            if markdown_text:
-                return markdown_text
-
-            fallback_lines: list[str] = []
-            for res in results:
-                if hasattr(res, "res"):
-                    fallback_lines.extend(self._collect_strings(getattr(res, "res")))
-                fallback_lines.extend(self._collect_strings(res))
-            return "\n".join(fallback_lines).strip()
+            page_texts: list[str] = []
+            for idx, res in enumerate(results):
+                page_text = self._extract_text_from_result(res=res, temp_dir=temp_dir, result_idx=idx)
+                if page_text:
+                    page_texts.append(page_text)
+            return page_texts

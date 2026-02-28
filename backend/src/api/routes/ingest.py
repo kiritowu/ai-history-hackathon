@@ -28,10 +28,7 @@ def create_router(
         pdf_ingest_source: PDFIngestSource = Depends(pdf_ingest_source_provider),
     ) -> IngestSuccessDTO:
         try:
-            payload = pdf_ingest_source.read_pdf_from_gcs(
-                gcs_uri=request.gcs_uri,
-                source_name=request.source_name,
-            )
+            payload = pdf_ingest_source.read_pdf_from_gcs(gcs_uri=request.gcs_uri)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:

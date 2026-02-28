@@ -19,9 +19,9 @@ class PDFIngestSource:
     def default_source_name(gcs_uri: str) -> str:
         return gcs_uri.rsplit("/", 1)[-1] or "document.pdf"
 
-    def read_pdf_from_gcs(self, gcs_uri: str, source_name: str | None = None) -> PDFPayload:
+    def read_pdf_from_gcs(self, gcs_uri: str) -> PDFPayload:
         pdf_bytes = self._gcs_client.download_bytes(gcs_uri)
-        resolved_name = source_name or self.default_source_name(gcs_uri)
+        resolved_name = self.default_source_name(gcs_uri)
         return PDFPayload(source_name=resolved_name, pdf_bytes=pdf_bytes)
 
     def read_pdfs_from_gcs(self, gcs_uris: list[str]) -> list[PDFPayload]:
