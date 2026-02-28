@@ -3,7 +3,7 @@
 Lean OCR -> vector retrieval -> chat pipeline built with:
 
 - PaddleOCR-VL server mode (`paddleocr` + `PaddleOCRVL`)
-- Weaviate (cloud or local) as vector store
+- Weaviate Cloud as vector store
 - OpenAI chat model for answer generation
 - Streamlit UI
 - `uv` for dependency management
@@ -22,7 +22,6 @@ The app follows interface-driven design so providers can be swapped with minimal
 
 - Python 3.12+
 - `uv` installed
-- Docker running (only for local Weaviate)
 - OpenAI API key
 - MLX-VLM inference server for PaddleOCR-VL (Apple Silicon flow)
 - `gcloud` CLI (for Cloud Run deployment flow)
@@ -53,20 +52,6 @@ The app follows interface-driven design so providers can be swapped with minimal
 
    ```bash
    OPENAI_API_KEY=...
-   ```
-
-5. Start Weaviate (skip if using Weaviate Cloud):
-
-   ```bash
-   docker compose up -d
-   ```
-
-6. Ensure OCR-VL client settings point to MLX server:
-
-   ```bash
-   PADDLEOCR_VL_BACKEND=mlx-vlm-server
-   PADDLEOCR_VL_SERVER_URL=http://127.0.0.1:8111/
-   PADDLEOCR_VL_API_MODEL_NAME=PaddlePaddle/PaddleOCR-VL-1.5
    ```
 
 ## Run
@@ -110,8 +95,7 @@ Single ingest (PDF from GCS):
 curl -X POST "http://127.0.0.1:8000/v1/ingest" \
   -H "Content-Type: application/json" \
   -d '{
-    "gcs_uri": "gs://my-bucket/path/to/document.pdf",
-    "source_name": "document.pdf"
+    "gcs_uri": "gs://my-bucket/path/to/document.pdf"
   }'
 ```
 
@@ -138,20 +122,18 @@ curl -X POST "http://127.0.0.1:8000/v1/ask" \
 ## GCS Ingest Configuration
 
 - Ingest payload expects a `gcs_uri` with `gs://bucket/path/file.pdf`.
+- `source_name` is derived automatically from the URI filename.
+- PDF ingestion is page-based: one indexed chunk per OCR page.
 - Configure Google credentials for `google-cloud-storage` (for example with `GOOGLE_APPLICATION_CREDENTIALS`).
 - Optional:
   - `GCP_PROJECT=<your-project-id>`
 
 ## Weaviate Configuration
 
-- Weaviate Cloud (preferred):
-  - `WEAVIATE_CLOUD_URL=https://<cluster-id>.weaviate.network`
-  - `WEAVIATE_CLOUD_API_KEY=<your-api-key>`
+- Weaviate Cloud:
+  - `WEAVIATE_URL=https://<cluster-id>.weaviate.network`
+  - `WEAVIATE_API_KEY=<your-api-key>`
   - `WEAVIATE_COLLECTION=DocumentChunk`
-- Local fallback:
-  - `WEAVIATE_HOST=localhost`
-  - `WEAVIATE_HTTP_PORT=8080`
-  - `WEAVIATE_GRPC_PORT=50051`
 
 ## Embedding Configuration
 
