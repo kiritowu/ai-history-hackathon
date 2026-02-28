@@ -90,7 +90,7 @@ export async function searchDocuments(query: string, limit: number = 5) {
       groupedTask: `Summarize the following search results for the query: "${query}"`,
       config: generativeParameters.openAI({
         // These parameters are optional
-        model: 'gpt-5-nano',
+        model: 'gpt-5.1',
         // frequencyPenalty: 0,
         // maxTokens: 500,
         // presencePenalty: 0,
