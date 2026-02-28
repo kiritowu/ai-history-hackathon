@@ -20,11 +20,6 @@ class PaddleOCRVLServerProvider(OCRProvider):
         self._vl_rec_server_url = vl_rec_server_url
         self._vl_rec_backend = vl_rec_backend
         self._vl_rec_api_model_name = vl_rec_api_model_name
-        self._pipeline: PaddleOCRVL | None = None
-
-    def _ensure_loaded(self) -> None:
-        if self._pipeline is not None:
-            return
 
         kwargs: dict[str, Any] = {
             "vl_rec_backend": self._vl_rec_backend,
@@ -96,9 +91,6 @@ class PaddleOCRVLServerProvider(OCRProvider):
         return "\n".join(fallback_lines).strip()
 
     def extract_text(self, image: Image.Image) -> str:
-        self._ensure_loaded()
-        assert self._pipeline is not None
-
         with TemporaryDirectory() as temp_dir_str:
             temp_dir = Path(temp_dir_str)
             image_path = temp_dir / "input.png"
@@ -121,18 +113,27 @@ class PaddleOCRVLServerProvider(OCRProvider):
         return "\n\n".join(page_texts).strip()
 
     def extract_text_pages_from_pdf_bytes(self, pdf_bytes: bytes) -> list[str]:
-        self._ensure_loaded()
-        assert self._pipeline is not None
+        page_batches = self.extract_text_page_batches_from_pdf_bytes(pdf_bytes=pdf_bytes, batch_size=1000)
+        return [page_text for batch in page_batches for page_text in batch]
+
+    def extract_text_page_batches_from_pdf_bytes(self, pdf_bytes: bytes, batch_size: int) -> list[list[str]]:
+        if batch_size < 1:
+            raise ValueError("batch_size must be >= 1.")
 
         with TemporaryDirectory() as temp_dir_str:
             temp_dir = Path(temp_dir_str)
             pdf_path = temp_dir / "input.pdf"
             pdf_path.write_bytes(pdf_bytes)
 
-            results = list(self._pipeline.predict(str(pdf_path)))
-            page_texts: list[str] = []
-            for idx, res in enumerate(results):
+            page_batches: list[list[str]] = []
+            current_batch: list[str] = []
+            for idx, res in enumerate(self._pipeline.predict(str(pdf_path))):
                 page_text = self._extract_text_from_result(res=res, temp_dir=temp_dir, result_idx=idx)
                 if page_text:
-                    page_texts.append(page_text)
-            return page_texts
+                    current_batch.append(page_text)
+                if len(current_batch) >= batch_size:
+                    page_batches.append(current_batch)
+                    current_batch = []
+            if current_batch:
+                page_batches.append(current_batch)
+            return page_batches

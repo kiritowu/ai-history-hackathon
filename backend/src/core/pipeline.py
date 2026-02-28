@@ -88,6 +88,7 @@ class RagPipeline:
         chat_service: ChatService,
         chunk_size: int = 700,
         chunk_overlap: int = 120,
+        pdf_page_batch_size: int = 10,
     ) -> None:
         self._ocr_provider = ocr_provider
         self._embedder = embedder
@@ -95,6 +96,7 @@ class RagPipeline:
         self._chat_service = chat_service
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
+        self._pdf_page_batch_size = pdf_page_batch_size
 
     @staticmethod
     def _normalize_chunks(chunks: Sequence[str]) -> list[str]:
@@ -125,6 +127,32 @@ class RagPipeline:
             ocr_text=ocr_text,
         )
 
+    def _upsert_chunk_batch(
+        self,
+        *,
+        doc_id: str,
+        source_name: str,
+        chunks: Sequence[str],
+        start_index: int,
+    ) -> int:
+        normalized_chunks = self._normalize_chunks(chunks)
+        if not normalized_chunks:
+            return 0
+
+        chunk_models = [
+            DocumentChunk(
+                chunk_id=str(uuid4()),
+                doc_id=doc_id,
+                source=source_name,
+                chunk_index=start_index + idx,
+                text=chunk,
+            )
+            for idx, chunk in enumerate(normalized_chunks)
+        ]
+        vectors = self._embedder.embed_texts([chunk.text for chunk in chunk_models])
+        self._vector_store.upsert_chunks(chunk_models, vectors)
+        return len(chunk_models)
+
     def _ingest_text_internal(self, text: str, source_name: str) -> IngestSuccess:
         chunks = chunk_text(text, chunk_size=self._chunk_size, overlap=self._chunk_overlap)
         if not chunks:
@@ -136,12 +164,36 @@ class RagPipeline:
         return self._ingest_text_internal(text=text, source_name=source_name)
 
     def _ingest_pdf_internal(self, pdf_bytes: bytes, source_name: str) -> IngestSuccess:
-        page_texts = self._ocr_provider.extract_text_pages_from_pdf_bytes(pdf_bytes)
-        normalized_page_texts = self._normalize_chunks(page_texts)
-        if not normalized_page_texts:
+        doc_id = str(uuid4())
+        indexed_count = 0
+        ocr_pages: list[str] = []
+        page_batches = self._ocr_provider.extract_text_page_batches_from_pdf_bytes(
+            pdf_bytes=pdf_bytes,
+            batch_size=self._pdf_page_batch_size,
+        )
+        for page_batch in page_batches:
+            normalized_batch = self._normalize_chunks(page_batch)
+            if not normalized_batch:
+                continue
+            inserted = self._upsert_chunk_batch(
+                doc_id=doc_id,
+                source_name=source_name,
+                chunks=normalized_batch,
+                start_index=indexed_count,
+            )
+            if inserted:
+                indexed_count += inserted
+                ocr_pages.extend(normalized_batch)
+
+        if indexed_count == 0:
             raise ValueError("No OCR text extracted from the provided document.")
-        full_text = "\n\n".join(normalized_page_texts)
-        return self._index_chunks(chunks=normalized_page_texts, source_name=source_name, ocr_text=full_text)
+        full_text = "\n\n".join(ocr_pages)
+        return IngestSuccess(
+            source_name=source_name,
+            doc_id=doc_id,
+            chunk_count=indexed_count,
+            ocr_text=full_text,
+        )
 
     def ingest_image(self, image: Image.Image, source_name: str) -> tuple[str, int, str]:
         result = self._ingest_image_internal(image=image, source_name=source_name)

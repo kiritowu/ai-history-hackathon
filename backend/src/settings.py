@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     rag_top_k: int = 4
     chunk_size: int = 700
     chunk_overlap: int = 120
+    pdf_page_batch_size: int = 10
 
 
 @lru_cache(maxsize=1)

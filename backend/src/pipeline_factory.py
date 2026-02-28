@@ -46,6 +46,7 @@ def create_pipeline() -> RagPipeline:
         chat_service=chat,
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
+        pdf_page_batch_size=settings.pdf_page_batch_size,
     )
 
 

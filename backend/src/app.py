@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import streamlit as st
+from PIL import Image
 
 from core.models import ChatTurn
 from core.pipeline import RagPipeline

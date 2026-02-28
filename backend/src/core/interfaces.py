@@ -21,6 +21,10 @@ class OCRProvider(ABC):
     def extract_text_pages_from_pdf_bytes(self, pdf_bytes: bytes) -> list[str]:
         """Extract page-level text from a PDF payload."""
 
+    @abstractmethod
+    def extract_text_page_batches_from_pdf_bytes(self, pdf_bytes: bytes, batch_size: int) -> list[list[str]]:
+        """Extract page-level text grouped into batches."""
+
 
 class Embedder(ABC):
     @abstractmethod
