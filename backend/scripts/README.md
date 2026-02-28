@@ -6,3 +6,9 @@ These 2 values should be the same!
 
 
 We define the `max_concurrency` param in our `ocr_all_to_file()` function, which sets the asyncio semaphore (i.e. max concurrent async requests at any given time...). This is the main driver of concurrency!
+
+
+
+
+Bucket naming preprocessing
+- Take the first 3 words + last 2 words of the filename. Then, replace "/" with "_". Lowercase everything. This is used as the folder name

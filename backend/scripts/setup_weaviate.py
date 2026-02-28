@@ -21,10 +21,13 @@ client = weaviate.connect_to_weaviate_cloud(
 
 # Create the collection. Weaviate's autoschema feature will infer properties when importing.
 questions = client.collections.create(
-    "TEST1",
+    "TEST3",
     vector_config=wvc.config.Configure.Vectors.self_provided(),
     properties=[
+        Property(name="source", data_type=DataType.TEXT),
         Property(name="text", data_type=DataType.TEXT),
+        Property(name="pageNumber", data_type=DataType.INT),
+        Property(name="imageUrl", data_type=DataType.TEXT),
     ],
 )
 
