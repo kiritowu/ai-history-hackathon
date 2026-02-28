@@ -90,6 +90,6 @@ for f in PREPROCESSED_DIR.glob("*.pkl"):
             )
         )
 
-        # Track which docs have been OCRd
-        with open(processed_text_filename, "w", encoding="utf-8") as f:
-            f.writelines(name)
+    # Track which docs have been OCRd
+    with open(processed_text_filename, "a", encoding="utf-8") as outfile:
+        outfile.write(name + "\n")
