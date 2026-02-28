@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import * as d3 from "d3"
 
@@ -105,18 +104,18 @@ export function VectorVisualization() {
       .attr("stroke", "rgba(255, 255, 255, 0.3)")
       .attr("stroke-width", 1)
       .style("cursor", "pointer")
-      .on("mouseenter", function(d: any) {
+      .on("mouseenter", function() {
         d3.select(this).transition().duration(200).attr("r", 14)
       })
-      .on("mouseleave", function(d: any) {
+      .on("mouseleave", function() {
         d3.select(this).transition().duration(200).attr("r", 10)
       })
       .call(
         d3
-          .drag()
+          .drag<SVGCircleElement, Node>()
           .on("start", dragStarted)
           .on("drag", dragged)
-          .on("end", dragEnded)
+          .on("end", dragEnded) as any
       )
 
     // Add labels
@@ -178,47 +177,59 @@ export function VectorVisualization() {
   }, [data])
 
   return (
-    <Card className="h-full flex flex-col glass rounded-xl overflow-hidden border-white/20">
-      <CardHeader className="flex flex-row items-center justify-between px-6 pt-6 pb-4 border-b border-white/10">
+    <div className="h-full flex flex-col bg-white/30 dark:bg-white/5 backdrop-blur-sm rounded-2xl border border-border overflow-hidden">
+      {/* Header */}
+      <div className="flex flex-row items-center justify-between px-8 py-6 border-b border-border bg-white/40 dark:bg-white/5">
         <div>
-          <CardTitle className="gradient-text text-2xl">Vector Space</CardTitle>
-          <p className="text-muted-foreground text-sm mt-1">Semantic clustering of AI history</p>
+          <h2 className="text-2xl font-bold gradient-text">Semantic Network</h2>
+          <p className="text-muted-foreground text-sm mt-1">Explore relationships across documents</p>
         </div>
         <Button 
-          variant="outline" 
-          size="sm" 
           onClick={fetchClusterData}
-          className="glass border-white/20 hover:bg-white/10 text-blue-400 hover:text-blue-300"
+          className="button-primary px-6 h-10 text-sm shadow-lg shadow-purple-500/30 dark:shadow-purple-500/20 hover:shadow-xl hover:shadow-purple-500/40"
+          disabled={isLoading}
         >
           Refresh
         </Button>
-      </CardHeader>
-      <CardContent className="flex-1 p-0 relative">
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-0 relative overflow-hidden">
         {isLoading ? (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-4">
-            <div className="relative w-12 h-12">
-              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-blue-400 border-r-cyan-400 animate-spin"></div>
-              <div className="absolute inset-2 rounded-full border-2 border-transparent border-b-purple-400 animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-white/20 to-white/5 dark:from-white/5 dark:to-transparent">
+            <div className="relative w-14 h-14">
+              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-purple-600 dark:border-t-purple-400 border-r-pink-600 dark:border-r-pink-400 animate-spin"></div>
+              <div 
+                className="absolute inset-2 rounded-full border-2 border-transparent border-b-cyan-600 dark:border-b-cyan-400 animate-spin" 
+                style={{animationDirection: 'reverse', animationDuration: '1.5s'}}
+              ></div>
             </div>
-            <p className="text-muted-foreground">Loading cluster data...</p>
+            <p className="text-muted-foreground font-medium">Loading vector space...</p>
           </div>
         ) : !data.nodes || data.nodes.length === 0 ? (
-          <div className="w-full h-full flex items-center justify-center">
-            <p className="text-muted-foreground">No data to visualize</p>
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/20 to-white/5 dark:from-white/5 dark:to-transparent">
+            <div className="text-center space-y-4">
+              <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 dark:from-purple-500/10 dark:to-pink-500/10 flex items-center justify-center">
+                <svg className="w-6 h-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <p className="text-muted-foreground">Upload documents to visualize semantic relationships</p>
+            </div>
           </div>
         ) : (
           <>
             <svg
               ref={svgRef}
               className="w-full h-full"
-              style={{ minHeight: "400px" }}
+              style={{ minHeight: "400px", background: "linear-gradient(135deg, rgba(168, 85, 247, 0.05) 0%, rgba(34, 211, 238, 0.05) 100%)" }}
             />
             {/* Grid overlay */}
-            <div className="absolute inset-0 pointer-events-none opacity-5">
+            <div className="absolute inset-0 pointer-events-none opacity-10">
               <svg className="w-full h-full">
                 <defs>
                   <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5"/>
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="0.5"/>
                   </pattern>
                 </defs>
                 <rect width="100%" height="100%" fill="url(#grid)" />
@@ -226,7 +237,7 @@ export function VectorVisualization() {
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

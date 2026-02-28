@@ -1,6 +1,7 @@
-import weaviate, { WeaviateClient } from "weaviate-client"
+import weaviate, { WeaviateClient, generativeParameters } from "weaviate-client"
 
-const COLLECTION_NAME = "DocumentChunkTest"
+const COLLECTION_NAME = "DemoCollection"
+// const COLLECTION_NAME = "DocumentChunkTest"
 
 let client: WeaviateClient | null = null
 
@@ -15,15 +16,13 @@ export async function getWeaviateClient() {
 
     try {
       if (weaviateKey) {
-        // Use WCD (Weaviate Cloud Deployment) connection
         client = await weaviate.connectToWeaviateCloud(weaviateURL, {
           authCredentials: new weaviate.ApiKey(weaviateKey),
           headers: {
-            'X-OpenAI-Api-Key': process.env.OPENAI_API_KEY,
+            'X-OpenAI-Api-Key': process.env.OPENAI_API_KEY as string,
           }
         })
       } else {
-        // Use local connection (no auth)
         client = await weaviate.connectToLocal()
       }
     } catch (error) {
@@ -34,26 +33,46 @@ export async function getWeaviateClient() {
   return client
 }
 
+export async function ensureCollection() {
+  const client = await getWeaviateClient()
+  const exists = await client.collections.exists(COLLECTION_NAME)
+  if (!exists) {
+    await client.collections.create({
+      name: COLLECTION_NAME,
+      vectorizers: weaviate.configure.vectors.text2VecOpenAI({
+        name: "default",
+        sourceProperties: ["content"],
+      }),
+      properties: [
+        { name: "content", dataType: "text" as const },
+        { name: "documentName", dataType: "text" as const, skipVectorization: true },
+        { name: "pageNumber", dataType: "int" as const, skipVectorization: true },
+      ],
+    })
+  }
+}
+
 export interface DocumentVector {
   content: string
   documentName: string
   pageNumber?: number
   metadata?: Record<string, any>
-  vector?: number[]
 }
 
 export async function addDocument(doc: DocumentVector) {
   const client = await getWeaviateClient()
-
-  const obj = {
-    content: doc.content,
-    documentName: doc.documentName,
-    pageNumber: doc.pageNumber,
-  }
+  await ensureCollection()
 
   try {
     const collection = client.collections.use(COLLECTION_NAME)
-    const result = await collection.data.insert(obj)
+    const properties: Record<string, any> = {
+      content: doc.content,
+      documentName: doc.documentName,
+    }
+    if (doc.pageNumber != null) {
+      properties.pageNumber = doc.pageNumber
+    }
+    const result = await collection.data.insert(properties)
     return result
   } catch (error) {
     console.error("Error adding document:", error)
@@ -63,10 +82,23 @@ export async function addDocument(doc: DocumentVector) {
 
 export async function searchDocuments(query: string, limit: number = 5) {
   const client = await getWeaviateClient()
+  await ensureCollection()
 
   try {
     const collection = client.collections.use(COLLECTION_NAME)
-    const result = await collection.query.nearText(query, {
+    const result = await collection.generate.nearText(query, {
+      groupedTask: `Summarize the following search results for the query: "${query}"`,
+      config: generativeParameters.openAI({
+        // These parameters are optional
+        model: 'gpt-5-nano',
+        // frequencyPenalty: 0,
+        // maxTokens: 500,
+        // presencePenalty: 0,
+        // temperature: 0.7,
+        // topP: 0.7,
+        // baseURL: "<custom-openai-url>",
+      }),
+    }, {
       limit,
       returnMetadata: ["distance"],
     })

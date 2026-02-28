@@ -1,47 +1,46 @@
 import { NextRequest, NextResponse } from "next/server"
+import { searchDocuments } from "@/lib/weaviate"
+import { chat, ChatMessage } from "@/lib/openai"
 
 export async function POST(request: NextRequest) {
   try {
     const { message, conversationHistory } = await request.json()
 
-    const backendUrl = process.env.BACKEND_API_URL || "http://localhost:8000"
+    // Retrieve relevant chunks from Weaviate using nearText (server-side vectorization)
+    const searchResult = await searchDocuments(message, 5)
+    const hits = searchResult.objects || []
 
-    // Build history in backend format
-    const history = (conversationHistory || []).map((msg: any) => ({
+    // Build context from retrieved chunks
+    const contextChunks = hits.map((hit: any, i: number) => {
+      const props = hit.properties
+      const source = props.documentName || "unknown"
+      return `[${i + 1}] (${source}):\n${props.content}`
+    })
+
+    const citations = hits.map((hit: any) => {
+      const props = hit.properties
+      return props.documentName || "unknown document"
+    })
+
+    // Build conversation messages for OpenAI
+    const messages: ChatMessage[] = (conversationHistory || []).map((msg: any) => ({
       role: msg.role,
       content: msg.content,
     }))
 
-    // Add current message
-    history.push({ role: "user", content: message })
+    // Append current user message with RAG context
+    const augmentedMessage = contextChunks.length > 0
+      ? `Context from indexed documents:\n${contextChunks.join("\n\n")}\n\nQuestion: ${message}`
+      : message
 
-    // Call backend RAG pipeline
-    const response = await fetch(`${backendUrl}/v1/ask`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question: message,
-        history,
-        top_k: 5,
-      }),
-    })
+    messages.push({ role: "user", content: augmentedMessage })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Backend error (${response.status}): ${errorText}`)
-    }
-
-    const data = await response.json()
-
-    // Extract citations from hits
-    const citations = data.hits?.map((hit: any) => {
-      const chunk = hit.chunk
-      return `${chunk.source} (chunk ${chunk.chunk_index})`
-    }) || []
+    // Generate answer via OpenAI
+    const answer = await chat(messages, citations)
 
     return NextResponse.json({
-      content: data.answer,
-      citations: citations.length > 0 ? citations : undefined,
+      content: answer,
+      citations: citations.length > 0 ? [...new Set(citations)] : undefined,
     })
   } catch (error) {
     console.error("Chat API error:", error)
