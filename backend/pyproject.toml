@@ -1,0 +1,31 @@
+[project]
+name = "ai-history-hackathon-draft"
+version = "0.1.0"
+description = "Lean OCR to RAG chat app using Streamlit + Weaviate"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.133.0",
+    "google-cloud-storage>=3.5.0",
+    "mlx-vlm>=0.3.12",
+    "openai>=2.23.0",
+    "paddleocr[doc-parser]>=3.4.0",
+    "paddlepaddle>=3.3.0",
+    "pillow>=12.1.1",
+    "pydantic-settings>=2.13.1",
+    "python-dotenv>=1.2.1",
+    "python-multipart>=0.0.22",
+    "sentence-transformers>=5.2.3",
+    "streamlit>=1.54.0",
+    "torch>=2.10.0",
+    "uvicorn>=0.41.0",
+    "weaviate-client>=4.20.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]

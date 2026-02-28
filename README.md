@@ -1,1 +1,1 @@
-# ai-history-hackathon
+# AI-History-Hackathon
