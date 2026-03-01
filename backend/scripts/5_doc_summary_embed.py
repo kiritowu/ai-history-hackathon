@@ -23,7 +23,7 @@ OUTPUT_DIR = Path("summary_outputs")
 PROCESSED_LOG = Path("doc_summary_processed.txt")
 FAILED_LOG = Path("doc_summary_failed.jsonl")
 
-SUMMARY_COLLECTION_NAME = "documentSummariesTest1"
+SUMMARY_COLLECTION_NAME = "documentSummariesTest3"
 SUMMARY_MODEL = "gpt-5.2"
 EMBED_MODEL = "text-embedding-3-large"
 
@@ -101,9 +101,9 @@ def build_document_prompt(filename: str, pages: list[tuple[int, str]]) -> str:
         "You are summarizing OCR text from a historical archive document.\n"
         "Return a concise summary in 5-8 bullet points that covers:\n"
         "- core topic/purpose\n"
-        "- key actors (people, organizations, governments)\n"
         "- geography/time period if present\n"
         "- major decisions, proposals, or events\n"
+        "- key actors (people, organizations, governments)\n"
         "- notable numbers/dates if present\n"
         "Do not invent information; if uncertain, state uncertainty clearly.\n\n"
         f"Document filename: {filename}\n"
