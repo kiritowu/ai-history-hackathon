@@ -19,6 +19,7 @@ export interface RetrievedSource {
   pageNumber?: number | null
   score?: number
   content: string
+  imageUrl?: string | null
 }
 
 interface RightPanelContextType {
@@ -244,11 +245,21 @@ export function RightPanelContent() {
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             Image
                           </p>
-                          <div className="mt-3 flex h-[calc(85vh-13rem)] items-center justify-center rounded-md bg-muted/30">
-                            <p className="text-sm text-muted-foreground">
-                              Page image preview coming soon
-                            </p>
-                          </div>
+                          {selectedSource.imageUrl ? (
+                            <div className="mt-3 h-[calc(85vh-13rem)] overflow-hidden rounded-md border border-border bg-muted/10">
+                              <img
+                                src={selectedSource.imageUrl}
+                                alt={`${selectedSource.documentName}${selectedSource.pageNumber ? ` page ${selectedSource.pageNumber}` : ""}`}
+                                className="h-full w-full object-contain"
+                              />
+                            </div>
+                          ) : (
+                            <div className="mt-3 flex h-[calc(85vh-13rem)] items-center justify-center rounded-md bg-muted/30">
+                              <p className="text-sm text-muted-foreground">
+                                Page image preview coming soon
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </DialogContent>
@@ -273,11 +284,21 @@ export function RightPanelContent() {
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Image
                     </p>
-                    <div className="mt-2 flex h-full min-h-0 items-center justify-center rounded-md bg-muted/30">
-                      <p className="text-xs text-muted-foreground">
-                        Page image preview coming soon
-                      </p>
-                    </div>
+                    {selectedSource.imageUrl ? (
+                      <div className="mt-2 h-full min-h-0 overflow-hidden rounded-md border border-border bg-muted/10">
+                        <img
+                          src={selectedSource.imageUrl}
+                          alt={`${selectedSource.documentName}${selectedSource.pageNumber ? ` page ${selectedSource.pageNumber}` : ""}`}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex h-full min-h-0 items-center justify-center rounded-md bg-muted/30">
+                        <p className="text-xs text-muted-foreground">
+                          Page image preview coming soon
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -153,6 +153,7 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
                 pageNumber?: number | null
                 score?: number
                 content?: string
+                imageUrl?: string | null
               }>
             }
           | undefined
@@ -164,6 +165,7 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
           pageNumber: s.pageNumber ?? null,
           score: s.score ?? 0,
           content: s.content ?? "",
+          imageUrl: s.imageUrl ?? null,
         }))
 
         if (parsed.length > 0) {
@@ -230,6 +232,7 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
                                 pageNumber?: number | null
                                 score?: number
                                 content?: string
+                                imageUrl?: string | null
                               }>
                             }
                           | undefined
@@ -240,6 +243,7 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
                           pageNumber: s.pageNumber ?? null,
                           score: s.score ?? 0,
                           content: s.content ?? "",
+                          imageUrl: s.imageUrl ?? null,
                         }))
 
                         if (!sources.length) {
