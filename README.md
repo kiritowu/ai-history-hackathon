@@ -34,7 +34,7 @@ Straits Cipher combines an OCR-to-RAG ingestion pipeline with a modern chat UI s
 
 ### 1) Grounded AI Q&A
 
-Hybrid retrieval (semantic + keyword) over Weaviate collections to improve evidence recall and precision.
+Hybrid retrieval (BM25: semantic + keyword) over Weaviate collections to improve evidence recall and precision.
 
 ### 2) Rich Source Context
 
@@ -46,7 +46,15 @@ Built-in follow-up suggestions and a visualization page help users move from one
 
 ### 4) End-to-End Ingestion Pipeline
 
-PDF preprocessing, OCR, embedding, and optional document-summary indexing pipeline for scalable knowledge base growth.
+PDF preprocessing, OCR, embedding, named entity recognition, and optional document-summary indexing pipeline for scalable knowledge base growth.
+
+### 5) Speedy, Scalable, and Customizable
+
+Using Modal for burstable GPU compute. 64 concurrent OCR requests at any time (~2min/1000 pages OCR). Use any OCR and Embedding model of your choice - hosted via OpenAI compatible vLLM server. 
+
+### 6) Highly Accurate OCR
+
+Using SOTA OCR models (GLM-OCR), with a two-tiered extraction system: An OCR extraction, followed by a LLM to parse the extracted text for inaccuracies. This drastically reduces bad OCR-extracted text.  
 
 ## Tech Stack
 
