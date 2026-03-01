@@ -1,188 +1,92 @@
-# Vector Store Chatbot
+# Straits Cipher Frontend
 
-A Next.js application that enables users to chat with documents stored in Weaviate vector database using OpenAI's LLM, with advanced visualization of document clusters.
+Next.js frontend for grounded AI-history Q&A powered by Weaviate retrieval and OpenAI models.
 
-## Features
+Check out the live deployment at:  
+https://ai-history-hackathon-529573690692.asia-southeast1.run.app
 
-### 1. Chat Interface
-- Upload documents (PDF, TXT, MD, DOCX)
-- Ask questions about your documents
-- Receive AI-generated answers with citations
-- Real-time conversation history
+## What Straits Cipher Can Do
 
-### 2. Vector Visualization
-- D3.js-powered graph visualization of document clusters
-- Interactive force-directed graph showing document relationships
-- Color-coded clusters based on semantic similarity
-- Draggable nodes for exploration
-- Displays similar concepts and related documents
+- Answer AI-history questions with **grounded, citation-backed responses**.
+- Combine **semantic + keyword search** to find the **most relevant source evidence**.
+- Show a **rich source context panel** with grouped pages, relevance scores, text snippets, and optional page images.
+- Suggest **smart follow-up questions** to help users continue exploration.
+- Visualize **relationships between documents** in an **interactive cluster map**.
+- Let users click **highlighted entities** in source text to launch **focused follow-up queries**.
 
 ## Prerequisites
 
 - Node.js 18+
-- Weaviate instance running (locally or remote)
-- OpenAI API key
+- Weaviate Cloud project with indexed documents
+- OpenAI API access
 
-## Setup
+## Required API Keys and Environment Variables
 
-1. **Install dependencies:**
-```bash
-pnpm install
-```
+Copy `.env.local.example` to `.env.local`:
 
-2. **Configure environment variables:**
 ```bash
 cp .env.local.example .env.local
 ```
 
-Update `.env.local` with:
-- `NEXT_PUBLIC_WEAVIATE_URL`: Your Weaviate instance URL
-- `WEAVIATE_API_KEY`: Weaviate API key (if needed)
-- `OPENAI_API_KEY`: Your OpenAI API key
+### Required
 
-3. **Run the development server:**
+- `WEAVIATE_API_KEY` - Weaviate API key
+- `OPENAI_API_KEY` - OpenAI API key
+
+### Optional (has defaults)
+
+- `WEAVIATE_COLLECTION` - collection used by `/api/chat` retrieval
+- `WEAVIATE_CLUSTERS_COLLECTION` - collection used by `/api/clusters` map
+- `WEAVIATE_HYBRID_ALPHA` (default `0.65`)
+- `OPENAI_CHAT_MODEL` (default `gpt-5.2`)
+- `OPENAI_EMBEDDING_MODEL` (default `text-embedding-3-small`)
+- `OPENAI_FOLLOWUP_MODEL` (default inherits `OPENAI_CHAT_MODEL`)
+- `NEXT_PUBLIC_API_URL` (default local frontend URL)
+
+## Getting Started
+
+### 1) Use the Live Deployment (Cloud Run) — Recommended
+
+1. Open the deployed app:  
+   https://ai-history-hackathon-529573690692.asia-southeast1.run.app
+2. Ask a question in **Straits Cipher** and verify citations appear.
+3. Open **Kratoska Index** to verify document relationship visualization.
+
+### 2) Run Locally (npm) — For Development
+
+1. Install dependencies:
+
 ```bash
-pnpm dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+2. Configure `.env.local` with the required values above.
 
-## Project Structure
+3. Start the development server:
 
-```
-frontend/
-├── app/
-│   ├── api/
-│   │   ├── chat/          # Chat endpoint
-│   │   ├── upload/        # Document upload endpoint
-│   │   └── clusters/      # Clustering visualization data
-│   ├── visualize/         # Visualization page
-│   ├── layout.tsx         # Root layout
-│   ├── page.tsx           # Chat page
-│   └── globals.css        # Global styles
-├── components/
-│   ├── ui/                # shadcn/ui components
-│   ├── ChatInterface.tsx  # Chat interface component
-│   ├── VectorVisualization.tsx # Visualization component
-│   └── Navigation.tsx     # Navigation component
-├── lib/
-│   ├── utils.ts           # Utility functions
-│   ├── weaviate.ts        # Weaviate client
-│   └── openai.ts          # OpenAI integration
-└── public/                # Static assets
-```
-
-## Usage
-
-### Chat with Documents
-1. Click the upload icon to select documents
-2. Ask questions about your documents in the chat input
-3. Responses include citations to source documents
-4. Conversation history is maintained during the session
-
-### Visualize Clusters
-1. Navigate to the "Visualize" tab
-2. View the document cluster graph
-3. Interact with the graph:
-   - Drag nodes to explore relationships
-   - Hover to see document names
-   - Colors represent different clusters
-4. Click "Refresh" to update with new documents
-
-## API Endpoints
-
-### POST `/api/chat`
-Sends a message and gets a response with citations.
-
-**Request:**
-```json
-{
-  "message": "What is this about?",
-  "conversationHistory": [],
-  "uploadedDocuments": []
-}
-```
-
-**Response:**
-```json
-{
-  "content": "Answer text...",
-  "citations": ["document.pdf"]
-}
-```
-
-### POST `/api/upload`
-Uploads a document and stores it in Weaviate.
-
-**Request:** FormData with `file` field
-
-**Response:**
-```json
-{
-  "documentId": "uuid",
-  "fileName": "document.pdf",
-  "message": "Document uploaded successfully"
-}
-```
-
-### GET `/api/clusters`
-Retrieves cluster data for visualization.
-
-**Response:**
-```json
-{
-  "nodes": [
-    {
-      "id": "uuid",
-      "label": "doc name",
-      "group": 0
-    }
-  ],
-  "links": [
-    {
-      "source": "uuid",
-      "target": "uuid",
-      "distance": 0.3
-    }
-  ]
-}
-```
-
-## Technologies Used
-
-- **Frontend:** Next.js, React, TypeScript
-- **UI Components:** shadcn/ui with Tailwind CSS
-- **Vector Database:** Weaviate
-- **LLM:** OpenAI GPT-3.5
-- **Visualization:** D3.js
-- **Embeddings:** OpenAI Embeddings API
-
-## Development
-
-### Build for production:
 ```bash
-pnpm build
-pnpm start
+npm run dev
 ```
 
-### Linting:
+4. Open `http://localhost:3000`.
+
+## Quick Verification Checklist
+
+1. Ask a question in chat and confirm a streamed assistant answer appears.
+2. Click citation chips (`[1]`, `[2]`) and confirm the source side panel opens.
+3. Confirm follow-up suggestions appear after the assistant responds.
+4. Visit `http://localhost:3000/visualize` and confirm the cluster graph renders.
+
+## Important Notes
+
+- This frontend does **not** currently provide a document upload API route.
+- Your ingestion pipeline must already populate the Weaviate collections used above.
+
+## Scripts
+
 ```bash
-pnpm lint
+npm run dev
+npm run build
+npm run start
+npm run lint
 ```
-
-## Notes
-
-- Documents are split into chunks and embedded using OpenAI's embedding model
-- Similarity search finds relevant documents for each query
-- K-means clustering groups similar documents for visualization
-- Cosine similarity is used for document relatedness
-
-## Future Enhancements
-
-- Support for more file formats (CSV, JSON)
-- Batch document processing
-- Document metadata and tagging
-- Advanced search filters
-- Custom clustering algorithms
-- Export visualization as image
-- Multi-language support
