@@ -1,6 +1,8 @@
 import weaviate, { WeaviateClient } from "weaviate-client"
 
 const WEAVIATE_COLLECTION = process.env.WEAVIATE_COLLECTION || "TEST2"
+const WEAVIATE_CLUSTERS_COLLECTION =
+  process.env.WEAVIATE_CLUSTERS_COLLECTION || WEAVIATE_COLLECTION
 
 let client: WeaviateClient | null = null
 
@@ -30,7 +32,7 @@ export async function getDocumentClusters() {
   const client = await getWeaviateClient()
 
   try {
-    const collection = client.collections.use(WEAVIATE_COLLECTION)
+    const collection = client.collections.use(WEAVIATE_CLUSTERS_COLLECTION)
     const result = await collection.query.fetchObjects({
       limit: 1000,
       includeVector: true,

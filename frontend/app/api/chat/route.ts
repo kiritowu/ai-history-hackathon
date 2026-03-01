@@ -65,19 +65,21 @@ export async function POST(request: Request) {
                 score: Math.max(0, Math.min(1, normalizedScore)),
                 content: properties?.text || properties?.content || "",
                 imageUrl: properties?.imageUrl || null,
+                nerText: properties?.ner ?? null,
               }
             })
 
              console.log("Retrieved sources:", {
               query,
               total: sources.length,
-              sources: sources.map((s: { index: number; documentName: string; pageNumber: number | null; score: number; content: string; imageUrl: string | null }) => ({
+              sources: sources.map((s: { index: number; documentName: string; pageNumber: number | null; score: number; content: string; imageUrl: string | null; nerText: unknown }) => ({
                 index: s.index,
                 documentName: s.documentName,
                 pageNumber: s.pageNumber,
                 score: s.score,
                 snippet: s.content.slice(0, 200),
                 hasImage: Boolean(s.imageUrl),
+                hasNerText: Boolean(s.nerText),
               })),
             })
 

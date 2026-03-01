@@ -67,10 +67,14 @@ export async function GET() {
 
     const documents = result.objects
 
-    // Extract vectors and prepare data
-    const vectors = documents
-      .map((doc: any) => doc.vectors?.default || doc.vector)
-      .filter((v: any) => v && Array.isArray(v))
+    // Keep document/vector alignment by filtering objects once.
+    const vectorizedDocuments = documents.filter((doc: any) => {
+      const vector = doc.vectors?.default || doc.vector
+      return vector && Array.isArray(vector)
+    })
+    const vectors = vectorizedDocuments.map(
+      (doc: any) => (doc.vectors?.default || doc.vector) as number[]
+    )
 
     if (vectors.length === 0) {
       return NextResponse.json({ nodes: [], links: [] })
@@ -80,18 +84,45 @@ export async function GET() {
     const { labels } = kMeansClustering(vectors, Math.min(5, vectors.length))
 
     // Create nodes
-    const nodes = documents.map((doc: any, i: number) => {
-      // Try to get a meaningful label from content or documentName
-      let label = "Document"
-      if (doc.properties?.content) {
-        label = doc.properties.content.substring(0, 30).replace(/\n/g, " ")
-      } else if (doc.properties?.documentName) {
-        label = doc.properties.documentName.split("/").pop() || "Document"
-      }
+    const nodes = vectorizedDocuments.map((doc: any, i: number) => {
+      // Prefer your current schema fields first: text + source.
+      const text =
+        doc.properties?.text ||
+        doc.properties?.content ||
+        ""
+      const sourceRaw = doc.properties?.source
+      const source = typeof sourceRaw === "string" ? sourceRaw : ""
+      const summaryRaw = doc.properties?.summary
+      const summary = typeof summaryRaw === "string" ? summaryRaw : ""
+      const pageCountRaw = doc.properties?.pageCount
+      const pageCount =
+        typeof pageCountRaw === "number"
+          ? pageCountRaw
+          : typeof pageCountRaw === "string"
+            ? Number.parseInt(pageCountRaw, 10)
+            : null
+
+      const sourceLabel =
+        source.split("/").pop() ||
+        doc.properties?.documentName ||
+        "Document"
+      const textSnippet = text
+        ? text.substring(0, 24).replace(/\n/g, " ").trim()
+        : "Document"
+
+      const label = text
+        ? `${sourceLabel}: ${textSnippet}`
+        : sourceLabel
+
       return {
         id: doc.id || i.toString(),
         label: label.substring(0, 25),
         group: labels[i],
+        documentName: doc.properties?.documentName || sourceLabel,
+        source: source || null,
+        pageCount: Number.isFinite(pageCount) ? pageCount : null,
+        summary: summary.trim(),
+        snippet: text.substring(0, 500).trim(),
       }
     })
 

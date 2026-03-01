@@ -86,6 +86,18 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
   }, [messages, onConversationStart, startedNotified])
 
   useEffect(() => {
+    const onNerQuery = (event: Event) => {
+      const customEvent = event as CustomEvent<{ query?: string }>
+      const query = customEvent.detail?.query?.trim()
+      if (!query) return
+      void handleSend(query)
+    }
+
+    window.addEventListener("right-panel-ner-query", onNerQuery)
+    return () => window.removeEventListener("right-panel-ner-query", onNerQuery)
+  }, [handleSend])
+
+  useEffect(() => {
     if (messages.length === 0) {
       lastSuggestedAssistantIdRef.current = null
       setFollowUpSuggestions(defaultSuggestions)
@@ -154,6 +166,7 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
                 score?: number
                 content?: string
                 imageUrl?: string | null
+                nerText?: unknown
               }>
             }
           | undefined
@@ -166,6 +179,7 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
           score: s.score ?? 0,
           content: s.content ?? "",
           imageUrl: s.imageUrl ?? null,
+          nerText: s.nerText ?? null,
         }))
 
         if (parsed.length > 0) {
@@ -233,6 +247,7 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
                                 score?: number
                                 content?: string
                                 imageUrl?: string | null
+                                nerText?: unknown
                               }>
                             }
                           | undefined
@@ -244,6 +259,7 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
                           score: s.score ?? 0,
                           content: s.content ?? "",
                           imageUrl: s.imageUrl ?? null,
+                          nerText: s.nerText ?? null,
                         }))
 
                         if (!sources.length) {

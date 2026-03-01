@@ -11,6 +11,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export interface RetrievedSource {
   id: string
@@ -20,6 +26,164 @@ export interface RetrievedSource {
   score?: number
   content: string
   imageUrl?: string | null
+  nerText?: unknown
+}
+
+type NerEntity = {
+  start?: number
+  end?: number
+  label?: string
+  original_label?: string
+  text?: string
+}
+
+type NerHighlight = {
+  start: number
+  end: number
+  label: string
+  originalLabel?: string
+}
+
+function getNerHighlightClass(label: string): string {
+  const normalizedLabel = label.toLowerCase()
+
+  if (normalizedLabel === "where_when") {
+    return "bg-sky-300/45 hover:bg-sky-300/60 dark:bg-sky-500/30 dark:hover:bg-sky-500/40"
+  }
+  if (normalizedLabel === "agent") {
+    return "bg-violet-300/45 hover:bg-violet-300/60 dark:bg-violet-500/30 dark:hover:bg-violet-500/40"
+  }
+  if (normalizedLabel === "other") {
+    return "bg-emerald-300/45 hover:bg-emerald-300/60 dark:bg-emerald-500/30 dark:hover:bg-emerald-500/40"
+  }
+
+  return "bg-amber-300/45 hover:bg-amber-300/60 dark:bg-amber-500/30 dark:hover:bg-amber-500/40"
+}
+
+function extractNerEntities(nerText: unknown): NerEntity[] {
+  if (!nerText) return []
+
+  const parsed = (() => {
+    if (typeof nerText === "string") {
+      try {
+        return JSON.parse(nerText)
+      } catch {
+        return null
+      }
+    }
+    return nerText
+  })()
+
+  if (!parsed) return []
+  if (Array.isArray(parsed)) return parsed as NerEntity[]
+
+  if (
+    typeof parsed === "object" &&
+    parsed !== null &&
+    "entities" in parsed &&
+    Array.isArray((parsed as { entities?: unknown }).entities)
+  ) {
+    return (parsed as { entities: NerEntity[] }).entities
+  }
+
+  return []
+}
+
+function buildNerHighlights(text: string, entities: NerEntity[]): NerHighlight[] {
+  if (!text || entities.length === 0) return []
+
+  const max = text.length
+  const normalized = entities
+    .map((entity) => {
+      const rawStart = typeof entity.start === "number" ? entity.start : -1
+      const rawEnd = typeof entity.end === "number" ? entity.end : -1
+      const start = Math.max(0, Math.min(max, rawStart))
+      const end = Math.max(0, Math.min(max, rawEnd))
+      const label = entity.label || entity.original_label || "entity"
+      const originalLabel = entity.original_label
+      return { start, end, label, originalLabel }
+    })
+    .filter((entity) => entity.start < entity.end)
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+
+  // Keep non-overlapping spans to avoid broken nested highlights.
+  const highlights: NerHighlight[] = []
+  let lastEnd = 0
+
+  for (const entity of normalized) {
+    if (entity.start < lastEnd) continue
+    highlights.push(entity)
+    lastEnd = entity.end
+  }
+
+  return highlights
+}
+
+function renderTextWithNer(
+  text: string,
+  entities: NerEntity[],
+  keyPrefix: string,
+  onEntityClick?: () => void,
+) {
+  const highlights = buildNerHighlights(text, entities)
+  if (highlights.length === 0) return text
+
+  const parts: JSX.Element[] = []
+  let cursor = 0
+
+  for (let i = 0; i < highlights.length; i += 1) {
+    const highlight = highlights[i]
+
+    if (cursor < highlight.start) {
+      parts.push(
+        <span key={`${keyPrefix}-plain-${i}`}>
+          {text.slice(cursor, highlight.start)}
+        </span>,
+      )
+    }
+
+    const tooltipLabel = highlight.originalLabel || highlight.label
+
+    parts.push(
+      <Tooltip key={`${keyPrefix}-ner-${i}`}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => {
+              const queryText = text.slice(highlight.start, highlight.end).trim()
+              if (!queryText) return
+              window.dispatchEvent(
+                new CustomEvent("right-panel-ner-query", {
+                  detail: { query: queryText },
+                }),
+              )
+              onEntityClick?.()
+            }}
+            className={`rounded-sm px-0.5 text-left transition-colors ${getNerHighlightClass(
+              highlight.label,
+            )}`}
+          >
+            {text.slice(highlight.start, highlight.end)}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-xs">{tooltipLabel}</p>
+        </TooltipContent>
+      </Tooltip>,
+    )
+
+    cursor = highlight.end
+  }
+
+  if (cursor < text.length) {
+    parts.push(
+      <span key={`${keyPrefix}-plain-tail`}>
+        {text.slice(cursor)}
+      </span>,
+    )
+  }
+
+  return parts
 }
 
 interface RightPanelContextType {
@@ -91,6 +255,11 @@ export function RightPanelTrigger() {
 export function RightPanelContent() {
   const { open, sources, selectedSourceId, selectSource } = useRightPanel()
   const selectedSource = sources.find((s) => s.id === selectedSourceId) ?? null
+  const [isSourceDialogOpen, setIsSourceDialogOpen] = useState(false)
+  const selectedSourceEntities = useMemo(
+    () => extractNerEntities(selectedSource?.nerText),
+    [selectedSource?.nerText],
+  )
   const groupedSourcesRef = useRef<HTMLDivElement | null>(null)
   const [showGroupedSourcesScrollHint, setShowGroupedSourcesScrollHint] = useState(false)
 
@@ -151,6 +320,7 @@ export function RightPanelContent() {
   }, [groupedSources, open, updateGroupedSourcesScrollHint])
 
   return (
+    <TooltipProvider delayDuration={120}>
     <div
       className="shrink-0 transition-[width] duration-200 ease-linear overflow-hidden"
       style={{ width: open ? "50%" : "0" }}
@@ -172,7 +342,7 @@ export function RightPanelContent() {
           </div>
         ) : (
           <div className="min-h-0 flex flex-1 flex-col gap-2 overflow-hidden p-3">
-            <div className="relative min-h-0 shrink-0 basis-1/2">
+            <div className="relative min-h-0 shrink-0 max-basis-1/2">
               <div ref={groupedSourcesRef} className="h-full space-y-1 overflow-y-auto pr-1">
                 {groupedSources.map((group) => (
                   <div key={group.documentName} className="rounded-md border border-border p-3">
@@ -211,7 +381,7 @@ export function RightPanelContent() {
               <div className="min-h-0 flex flex-1 flex-col rounded-md border border-border p-3">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold">Selected source</p>
-                  <Dialog>
+                  <Dialog open={isSourceDialogOpen} onOpenChange={setIsSourceDialogOpen}>
                     <DialogTrigger asChild>
                       <Button
                         variant="ghost"
@@ -237,9 +407,14 @@ export function RightPanelContent() {
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             Text
                           </p>
-                          <p className="mt-3 h-[calc(85vh-13rem)] overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
-                            {selectedSource.content}
-                          </p>
+                          <div className="mt-3 h-[calc(85vh-13rem)] overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
+                            {renderTextWithNer(
+                              selectedSource.content,
+                              selectedSourceEntities,
+                              "overlay",
+                              () => setIsSourceDialogOpen(false),
+                            )}
+                          </div>
                         </div>
                         <div className="min-h-0 rounded-md border border-dashed border-border p-4">
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -256,7 +431,7 @@ export function RightPanelContent() {
                           ) : (
                             <div className="mt-3 flex h-[calc(85vh-13rem)] items-center justify-center rounded-md bg-muted/30">
                               <p className="text-sm text-muted-foreground">
-                                Page image preview coming soon
+                                Page image preview unavailable
                               </p>
                             </div>
                           )}
@@ -275,9 +450,13 @@ export function RightPanelContent() {
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Text
                     </p>
-                    <p className="mt-2 max-h-full overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
-                      {selectedSource.content}
-                    </p>
+                    <div className="mt-2 max-h-full overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
+                      {renderTextWithNer(
+                        selectedSource.content,
+                        selectedSourceEntities,
+                        "inline",
+                      )}
+                    </div>
                   </div>
 
                   <div className="min-h-0 rounded-md border border-dashed border-border p-3">
@@ -307,5 +486,6 @@ export function RightPanelContent() {
         )}
       </div>
     </div>
+    </TooltipProvider>
   )
 }
