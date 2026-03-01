@@ -2,13 +2,48 @@ from openai import OpenAI, AsyncOpenAI
 import pathlib
 import pickle
 import asyncio
+from pydantic_ai import Agent
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
+
+
+class CleanedText(BaseModel):
+    cleaned: str
+
+
+cleaner_system_prompt = """You are an OCR cleanup assistant. You will be given a set of OCR extracted text for further processing.
+
+Apply a two-pass method:
+
+Pass 1 (Cleanup):
+- Remove OCR noise and malformed characters.
+- Fix obvious formatting issues (line breaks, hyphenation).
+- Preserve all semantically important content (names, numbers, dates, IDs, addresses, technical/legal language).
+
+Pass 2 (Integrity check):
+- Scan the cleaned text for potentially lost information: numbers, dates, proper nouns, headings, list items, table rows.
+- If anything important may have been removed, restore it (from the original) or mark [POSSIBLY MISSING].
+
+Constraints:
+- Never invent text not present in the OCR.
+- If uncertain, keep original fragments and mark [UNCLEAR].
+
+Output only the final cleaned text.""".strip()
+
+cleaner_agent = Agent(
+    "openai:gpt-4.1-mini",
+    output_type=CleanedText,
+    system_prompt=cleaner_system_prompt,
+)
 
 
 PREPROCESSED_DIR = pathlib.Path("preprocessed")
 EXTRACTED_DIR = pathlib.Path("OCRd")
 
 # Keep track of which files have been processed, so we don't repeat
-processed_text_filename = "processed.txt"
+processed_text_filename = "ocr_processed.txt"
 
 with open(processed_text_filename, "r", encoding="utf-8") as f:
     processed_items = f.read().splitlines()
@@ -23,7 +58,7 @@ MODEL_NAME = "zai-org/GLM-OCR"
 
 url = f"{ENDPOINT}/v1"
 
-client = AsyncOpenAI(api_key=api_key, base_url=url, timeout=3600)
+client = AsyncOpenAI(api_key=api_key, base_url=url, timeout=60)
 
 
 def build_messages(page_url: str):
@@ -40,13 +75,31 @@ def build_messages(page_url: str):
 
 async def ocr_one(idx: int, page_url: str, sem: asyncio.Semaphore):
     async with sem:
-        resp = await client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=build_messages(page_url),
-            temperature=0.0,
-        )
-        print(resp.json())
-        text = resp.choices[0].message.content
+        retry_count = 1
+        while retry_count < 3:
+            try:
+                resp = await client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=build_messages(page_url),
+                    temperature=0.0,
+                )
+                break
+            except Exception as e:
+                print(repr(e))
+                retry_count += 1
+        else:
+            return idx, "[UNABLE TO SCRAPE]"
+
+        print(resp)
+        try:
+            text = resp.choices[0].message.content
+        except AttributeError as e:
+            return idx, "[UNABLE TO SCRAPE]"
+
+        # Run OCR cleaning using another model
+        resp = await cleaner_agent.run(f"OCR Text: {text}")
+        text = resp.output.cleaned
+
         return idx, text
 
 
@@ -86,7 +139,7 @@ for f in PREPROCESSED_DIR.glob("*.pkl"):
             ocr_all_to_file(
                 page_urls,
                 output_path=f"{name}.txt",
-                max_concurrency=8,
+                max_concurrency=64,
             )
         )
 

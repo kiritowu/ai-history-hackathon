@@ -34,7 +34,7 @@ CONFIGS = {
     },
     "GLM-OCR": {  # Needs 4GB vRAM
         "MODEL_NAME": "zai-org/GLM-OCR",
-        "GPU": "L4",
+        "GPU": "L40S",
         "N_GPU": 1,
         "args": [],
     },
@@ -56,7 +56,7 @@ CHOSEN = CONFIGS["GLM-OCR"]
     enable_memory_snapshot=True,  # Allow CPU memory snapshot
     secrets=[modal.Secret.from_name("huggingface-secret")],
 )
-@modal.concurrent(max_inputs=4)  # how many requests can one replica handle?
+@modal.concurrent(max_inputs=8)  # how many requests can one replica handle?
 @modal.web_server(port=VLLM_PORT, startup_timeout=600)
 def serve():
     import subprocess
@@ -82,7 +82,7 @@ def serve():
         # "--max-model-len",
         # "8192",  # 4096
         "--max-num-seqs",  # Amount of concurrent requests supported. Lower amount = reduce KV cache usage
-        "4",
+        "12",
         # "--cpu-offload-gb",
         # "8",
         "--mm-processor-cache-gb",

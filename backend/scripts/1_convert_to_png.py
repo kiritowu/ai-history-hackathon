@@ -8,6 +8,7 @@ import base64
 import pickle
 from google.cloud import storage
 from dotenv import load_dotenv
+import re
 
 import asyncio
 
@@ -23,6 +24,10 @@ BUCKET_NAME = "ai-history-hackathon-bucket"
 
 bucket = client.bucket(BUCKET_NAME)
 
+processed_images_filename = "img_processed.txt"
+with open(processed_images_filename, "r", encoding="utf-8") as f:
+    processed_items = f.read().splitlines()
+
 
 # Will also upload to google cloud storage... as /imgs/<First 3 words + Last 3 words>/<pageNo>.png
 async def process_pdf_async(
@@ -34,9 +39,15 @@ async def process_pdf_async(
 ) -> Path:
 
     filename = pdf_path.stem
-    words = filename.split()
+    match = re.search(r"^(.*?)__\s*(CO\s*\d+:\d+:\d+)", filename)
+
+    if match:
+        name = match.group(1)
+        co_number = match.group(2).replace(" ", "")  # remove the spacing, so we get COXYZ instead of CO xyz
+
+    words = name.split()
     selected = words if len(words) <= 5 else (words[:3] + words[-2:])
-    folder_name = "_".join(selected).lower()
+    folder_name = co_number + "__" + "_".join(selected).lower()
 
     pages = convert_from_path(str(pdf_path), dpi=dpi)
 
@@ -75,13 +86,11 @@ async def process_pdf_async(
 
 def main():
     pdfs = list(DATA_DIR.glob("*.pdf"))
-    out_dir = Path("preprocessed")
-
-    import os
-
-    max_workers = min(4, os.cpu_count() or 1)
 
     for pdf in pdfs:
+        if pdf.name in processed_items:
+            print(f"Skipping! Already processed {pdf}...")
+            continue
         print(pdf)
 
         out_path = asyncio.run(
@@ -95,6 +104,10 @@ def main():
         )
 
         print("Saved:", out_path)
+
+        # Track which docs have been OCRd
+        with open(processed_images_filename, "a", encoding="utf-8") as outfile:
+            outfile.write(pdf.name + "\n")
 
 
 if __name__ == "__main__":
