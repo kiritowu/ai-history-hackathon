@@ -38,6 +38,16 @@ interface ChatInterfaceProps {
   onConversationStart?: () => void
 }
 
+const CITATION_URL_PREFIX = "https://citation.local/"
+
+function linkifyCitations(text: string, allowedIndices: Set<number>) {
+  return text.replace(/\[(\d+)\]/g, (match, rawIndex: string) => {
+    const citationIndex = Number.parseInt(rawIndex, 10)
+    if (!Number.isInteger(citationIndex) || !allowedIndices.has(citationIndex)) return match
+    return `[${citationIndex}](${CITATION_URL_PREFIX}${citationIndex})`
+  })
+}
+
 function LoadingState({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -220,10 +230,95 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
             messages.map((msg) => (
               <Message key={msg.id} from={msg.role}>
                 <MessageContent>
-                  {msg.parts.map((part, index) => {
+                  {(() => {
+                    const messageSources: RetrievedSource[] = []
+                    const sourcesByIndex = new Map<number, RetrievedSource>()
+
+                    for (let partIndex = 0; partIndex < msg.parts.length; partIndex += 1) {
+                      const messagePart = msg.parts[partIndex]
+                      if (
+                        messagePart.type !== "tool-search_documents" ||
+                        messagePart.state !== "output-available"
+                      ) {
+                        continue
+                      }
+
+                      const output = messagePart.output as
+                        | {
+                            sources?: Array<{
+                              index: number
+                              documentName: string
+                              pageNumber?: number | null
+                              score?: number
+                              content?: string
+                              imageUrl?: string | null
+                              nerText?: unknown
+                            }>
+                          }
+                        | undefined
+
+                      const parsed = (output?.sources ?? []).map((s) => ({
+                        id: `${msg.id}-${partIndex}-${s.index}`,
+                        index: s.index,
+                        documentName: s.documentName,
+                        pageNumber: s.pageNumber ?? null,
+                        score: s.score ?? 0,
+                        content: s.content ?? "",
+                        imageUrl: s.imageUrl ?? null,
+                        nerText: s.nerText ?? null,
+                      }))
+
+                      for (const source of parsed) {
+                        messageSources.push(source)
+                        sourcesByIndex.set(source.index, source)
+                      }
+                    }
+
+                    const allowedCitationIndices = new Set(sourcesByIndex.keys())
+
+                    return msg.parts.map((part, index) => {
                     if (part.type === "text") {
                       return msg.role === "assistant" ? (
-                        <MessageResponse key={index}>{part.text}</MessageResponse>
+                        <MessageResponse
+                          key={index}
+                          components={{
+                            a: ({ href, children, ...props }) => {
+                              const citationIndexFromHref = href?.startsWith(CITATION_URL_PREFIX)
+                                ? Number.parseInt(href.slice(CITATION_URL_PREFIX.length), 10)
+                                : Number.NaN
+                              const citationIndexFromText = Number.parseInt(
+                                String(children).replace(/[^\d]/g, ""),
+                                10,
+                              )
+                              const citationIndex = Number.isInteger(citationIndexFromHref)
+                                ? citationIndexFromHref
+                                : citationIndexFromText
+                              const source = sourcesByIndex.get(citationIndex)
+                              if (source) {
+                                return (
+                                  <button
+                                    type="button"
+                                    className="mx-0.5 rounded border border-border px-1 text-xs font-medium text-primary hover:bg-primary/10"
+                                    onClick={() => {
+                                      setSources(messageSources)
+                                      selectSource(source.id)
+                                      openPanel()
+                                    }}
+                                  >
+                                    {children}
+                                  </button>
+                                )
+                              }
+                              return (
+                                <a href={href} {...props}>
+                                  {children}
+                                </a>
+                              )
+                            },
+                          }}
+                        >
+                          {linkifyCitations(part.text, allowedCitationIndices)}
+                        </MessageResponse>
                       ) : (
                         <p key={index}>{part.text}</p>
                       )
@@ -295,7 +390,8 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
                     }
 
                     return null
-                  })}
+                    })
+                  })()}
                 </MessageContent>
               </Message>
             ))
