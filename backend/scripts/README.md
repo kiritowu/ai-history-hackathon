@@ -1,52 +1,37 @@
-Concurrency is handled by 2 params
-- `max-num-seqs` param in `vllm serve`: Number of API requests one vllm server can process simultaneously
-- `max-inputs` in `@modal.concurrent(max_inputs=4)`: Number of inputs each modal container can handle... if total requests exceeds this, modal will spin up more containers
+# Backend Scripts
 
-These 2 values should be the same!
+This directory organizes backend scripts by purpose:
 
+- `pipeline/`: main ingestion pipeline scripts (`0_rename.py` to `5_doc_summary_embed.py`)
+- `infra/`: infrastructure and deployment scripts (`setup_weaviate.py`, `vllm_server.py`)
+- `dev/`: ad-hoc local test scripts (`test_ocr.py`, `test_gcp_storage.py`)
 
-We define the `max_concurrency` param in our `ocr_all_to_file()` function, which sets the asyncio semaphore (i.e. max concurrent async requests at any given time...). This is the main driver of concurrency!
+## How to run
 
+Run all scripts from the `backend/` directory so relative paths resolve correctly (`data/`, `preprocessed/`, `OCRd/`, `*_processed.txt`, etc.).
 
+## Current ingestion behavior
 
+- Input PDFs are discovered from `backend/data/*.pdf`.
+- `0_rename.py` normalizes names to `Title__CO123:456:789.pdf` (when source names match its regex).
+- `1_convert_to_png.py` reads from `data/`, writes `preprocessed/*.pdf.pkl`, uploads page PNGs to GCS, and tracks processed files in `img_processed.txt`.
+- `2_OCR.py` reads `preprocessed/*.pkl` and writes OCR output to `OCRd/*.txt`.
+- `3_embed.py` reads `OCRd/*.txt` and uploads vectors to Weaviate while tracking progress in `embed_processed.txt`.
 
-Bucket naming preprocessing
-- Take the first 3 words + last 2 words of the filename. Then, replace "/" with "_". Lowercase everything. This is used as the folder name
+Before first run, make sure these files exist (empty is OK): `img_processed.txt`, `ocr_processed.txt`, `embed_processed.txt`, `doc_summary_processed.txt`.
 
+Current code note: `2_OCR.py` has the OCR run/write section commented out at the moment, so it will not emit `OCRd/*.txt` unless that section is uncommented.
 
+Example:
 
-
-### Spacy
-What each label is
-PERSON: a person (e.g., “John Smith”)
-- ORG: organization/company/institution (e.g., “Google”, “UN”)
-- NORP: nationality, religious, political group (e.g., “American”, “Buddhist”, “Democrats”)
-
-Places / locations
-- GPE: geopolitical entity (countries, cities, states) (e.g., “Singapore”, “California”)
-- LOC: non-political location (e.g., “Pacific Ocean”, “Mount Everest”)
-- FAC: facilities/buildings/infrastructure (e.g., “Changi Airport”, “Golden Gate Bridge”)
-
-Time
-- DATE: dates or date ranges (e.g., “3 March 2026”, “last year”)
-- TIME: times (e.g., “10:30am”, “midnight”)
-
-Numbers / measurements
-- CARDINAL: plain numbers not fitting other types (e.g., “two”, “42”)
-- ORDINAL: ordered numbers (e.g., “1st”, “second”)
-- PERCENT: percentages (e.g., “15%”)
-- MONEY: money amounts (e.g., “$10”, “S$2 million”)
-- QUANTITY: measurements (e.g., “10 km”, “3 kg”)
-
-Things
-- PRODUCT: objects/products (e.g., “iPhone”, “Model 3”)
-- WORK_OF_ART: titles of books/songs/movies/art (e.g., “Mona Lisa”, “Hamlet”)
-
-Other named “concepts”
-- EVENT: named events (e.g., “World War II”, “Olympics”)
-- LAW: named laws/acts (e.g., “GDPR”, “Constitution”)
-- LANGUAGE: named languages (e.g., “English”, “Mandarin”)
-
-
-
-We reduce this into 3 groups - "agent", "where_when", "others"
+```bash
+cd ./backend
+python scripts/pipeline/0_rename.py
+python scripts/pipeline/1_convert_to_png.py
+python scripts/pipeline/2_OCR.py
+python scripts/pipeline/3_embed.py
+python scripts/infra/setup_weaviate.py
+modal run scripts/infra/vllm_server.py
+python scripts/dev/test_ocr.py
+python scripts/dev/test_gcp_storage.py
+```

@@ -1,198 +1,140 @@
-# OCR to RAG Chat App
+# Backend
 
-Lean OCR -> vector retrieval -> chat pipeline built with:
+OCR-to-RAG backend pipeline for processing historical archive PDFs into searchable vectors and document summaries.
 
-- PaddleOCR-VL server mode (`paddleocr` + `PaddleOCRVL`)
-- Weaviate Cloud as vector store
-- OpenAI chat model for answer generation
-- Streamlit UI
-- `uv` for dependency management
+## Key Features
 
-## Architecture
+- Multi-stage document pipeline: rename -> PDF-to-image preprocessing -> OCR extraction -> chunk embedding -> document summary embedding.
+- Document-level summary embedding flow for generating a high-level knowledge map of each document.
+- Weaviate integration for vector storage (page-level and summary-level collections).
+- Modal-powered vLLM OCR server support for image-to-text extraction.
+- Simple progress tracking with `*_processed.txt` logs for resumable runs.
 
-The app follows interface-driven design so providers can be swapped with minimal code changes:
+## What The Pipeline Does
 
-- `OCRProvider` -> document/image to raw text
-- `Embedder` -> text to vectors
-- `VectorStore` -> persist/query chunk vectors
-- `ChatService` -> generate answer from retrieved context
-- `RagPipeline` -> orchestration layer
+The pipeline transforms raw archive PDFs into Weaviate vectors and document summaries:
 
-## Prerequisites
+1. PDFs are placed in `backend/data/*.pdf`.
+2. Filenames are normalized by `0_rename.py` to `Title__CO123:456:789.pdf`.
+3. `1_convert_to_png.py` converts each PDF page to PNG, uploads pages to GCS (`imgs/...`), and stores page data URLs in `preprocessed/*.pdf.pkl`.
+4. `2_OCR.py` reads `preprocessed/*.pkl` and writes OCR text files to `OCRd/*.txt` (page-delimited format).
+5. `3_embed.py` reads `OCRd/*.txt`, generates embeddings + NER metadata, and inserts records into Weaviate.
+6. `5_doc_summary_embed.py` optionally creates per-document summaries + embeddings.
 
-- Python 3.12+
+Current code note: the actual OCR execution/write block in `scripts/pipeline/2_OCR.py` is currently commented out. Running it as-is will enumerate files but will not write `OCRd/*.txt` until that block is uncommented.
+
+![Pipeline Architecture](assets/architecture-diagram.jpg)
+
+## Folder Structure
+
+```text
+backend/
+├── data/                      # Input PDFs (ingestion source)
+├── preprocessed/              # Intermediate per-PDF pickle files from step 1
+├── scripts/
+│   ├── pipeline/
+│   │   ├── 0_rename.py
+│   │   ├── 1_convert_to_png.py
+│   │   ├── 2_OCR.py
+│   │   ├── 3_embed.py
+│   │   ├── 4_ner.py
+│   │   └── 5_doc_summary_embed.py
+│   ├── infra/
+│   │   ├── setup_weaviate.py
+│   │   └── vllm_server.py
+│   └── dev/
+│       ├── test_ocr.py
+│       └── test_gcp_storage.py
+├── OCRd/                      # OCR output text files
+├── summary_outputs/           # Per-document summary JSON outputs
+├── logs/                      # Runtime logs (e.g. summary pipeline logs)
+├── img_processed.txt          # Process tracking for PDF->image preprocessing
+├── ocr_processed.txt          # Process tracking for OCR stage
+├── embed_processed.txt        # Process tracking for embedding stage
+├── doc_summary_processed.txt  # Process tracking for summary stage
+├── pyproject.toml
+└── uv.lock
+```
+
+## Getting Started
+
+### 1) Prerequisites
+
+- Python `>=3.12`
 - `uv` installed
-- OpenAI API key
-- MLX-VLM inference server for PaddleOCR-VL (Apple Silicon flow)
-- `gcloud` CLI (for Cloud Run deployment flow)
+- System dependencies for `pdf2image` (Poppler)
+- Access credentials configured in `.env` (as required by scripts), for example:
+  - `OPENAI_API_KEY`
+  - `WEAVIATE_URL`
+  - `WEAVIATE_API_KEY`
+  - GCP credentials for `google-cloud-storage`
 
-## Setup
-
-1. Install dependencies:
-
-   ```bash
-   uv sync
-   ```
-
-2. Start MLX-VLM inference server (required before OCR ingestion):
-
-   ```bash
-   uv run mlx_vlm.server --port 8111
-   ```
-
-   Keep this process running while using the app.
-
-3. Create environment file:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-4. Set your key in `.env`:
-
-   ```bash
-   OPENAI_API_KEY=...
-   ```
-
-## Run
-
-Run the app with Streamlit:
+### 2) Install dependencies
 
 ```bash
-uv run streamlit run src/app.py
+cd ai-history-hackathon/backend
+uv sync
 ```
 
-Open the local Streamlit URL, then:
+### 3) Bootstrap first-time local run
 
-1. Upload one or many images in the sidebar.
-2. Click **Run OCR + Index**.
-3. If some files fail, click **Retry failed files** to retry only failures.
-4. Ask questions in chat input (defaults to searching across all indexed docs).
-5. Optionally filter chat/chunk browsing by selected document(s).
-6. Expand **Retrieved chunks** to inspect RAG context.
-
-## Run Backend API (FastAPI)
-
-Start the backend server:
+Create expected folders and progress files before the first run:
 
 ```bash
-uv run uvicorn api.main:app --app-dir src --reload
+cd ai-history-hackathon/backend
+mkdir -p data preprocessed OCRd logs summary_outputs
+touch img_processed.txt ocr_processed.txt embed_processed.txt doc_summary_processed.txt
 ```
 
-The API docs are available at `http://127.0.0.1:8000/docs`.
+### 4) Run scripts from `backend/` directory
 
-### API Smoke Examples
+Run from `backend/` folder directly so relative paths resolve correctly (`data/`, `preprocessed/`, `OCRd/`, `*_processed.txt`).
 
-Health:
+Example:
+```bash
+cd ai-history-hackathon/backend
+python scripts/pipeline/0_rename.py
+python scripts/pipeline/1_convert_to_png.py
+python scripts/pipeline/2_OCR.py
+python scripts/pipeline/3_embed.py
+python scripts/pipeline/5_doc_summary_embed.py
+```
+
+### 5) Prepare ingestion inputs
+
+1. Put source PDFs into `backend/data/`.
+2. (Optional) Run rename normalization:
+   - `python scripts/pipeline/0_rename.py`
 
 ```bash
-curl http://127.0.0.1:8000/health
+cd ai-history-hackathon/backend
+
+# One-time setup for page-level collection.
+# Note: this may fail if collection already exists.
+python scripts/infra/setup_weaviate.py
+
+# OCR server mode A (use currently hardcoded hosted endpoint in 2_OCR.py):
+# - no extra command needed here.
+#
+# OCR server mode B (self-hosted on your own Modal deployment):
+# - deploy/run scripts/infra/vllm_server.py
+# - then update ENDPOINT and api_key constants inside scripts/pipeline/2_OCR.py
+# modal run scripts/infra/vllm_server.py
+
+# Main pipeline
+python scripts/pipeline/1_convert_to_png.py
+
+# IMPORTANT:
+# scripts/pipeline/2_OCR.py currently has its OCR run section commented out.
+# Uncomment that block first, then run:
+python scripts/pipeline/2_OCR.py
+
+# Run after OCR text files exist in OCRd/
+python scripts/pipeline/3_embed.py
+
+# Optional helpers
+python scripts/pipeline/4_ner.py
+python scripts/pipeline/5_doc_summary_embed.py
 ```
 
-Single ingest (PDF from GCS):
-
-```bash
-curl -X POST "http://127.0.0.1:8000/v1/ingest" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "gcs_uri": "gs://my-bucket/path/to/document.pdf"
-  }'
-```
-
-Ask:
-
-```bash
-curl -X POST "http://127.0.0.1:8000/v1/ask" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "What are the key points?",
-    "top_k": 4
-  }'
-```
-
-## OCR Configuration
-
-- Uses `PaddleOCRVL` with:
-  - `PADDLEOCR_VL_BACKEND=mlx-vlm-server`
-  - `PADDLEOCR_VL_SERVER_URL=http://127.0.0.1:8111/`
-  - `PADDLEOCR_VL_API_MODEL_NAME=PaddlePaddle/PaddleOCR-VL-1.5`
-- For Apple Silicon setup details and tuning guidance, see PaddleOCR docs:
-  - https://www.paddleocr.ai/latest/en/version3.x/pipeline_usage/PaddleOCR-VL-Apple-Silicon.html
-
-## GCS Ingest Configuration
-
-- Ingest payload expects a `gcs_uri` with `gs://bucket/path/file.pdf`.
-- `source_name` is derived automatically from the URI filename.
-- PDF ingestion is page-based: one indexed chunk per OCR page.
-- Configure Google credentials for `google-cloud-storage` (for example with `GOOGLE_APPLICATION_CREDENTIALS`).
-- Optional:
-  - `GCP_PROJECT=<your-project-id>`
-
-## Local SSO PDF Scraper
-
-The standalone scraper has been moved out of backend and now lives in `scraper/`.
-See `scraper/README.md` for setup and run instructions.
-
-## Weaviate Configuration
-
-- Weaviate Cloud:
-  - `WEAVIATE_URL=https://<cluster-id>.weaviate.network`
-  - `WEAVIATE_API_KEY=<your-api-key>`
-  - `WEAVIATE_COLLECTION=DocumentChunk`
-- Embeddings are generated externally by the backend embedder and upserted with vectors.
-
-## Cloud Run Deployment (vLLM)
-
-This repo includes scripts/config to deploy OCR service on Cloud Run:
-
-- OCR service: `PaddlePaddle/PaddleOCR-VL-1.5`
-
-### Deploy Steps
-
-1. Copy deploy env template:
-
-```bash
-cp deploy/cloudrun/env.sh.example deploy/cloudrun/env.sh
-```
-
-2. Edit `deploy/cloudrun/env.sh` with project/region and sizing.
-
-3. Deploy OCR service with your Cloud Run deploy script:
-
-```bash
-# Example:
-# bash deploy/cloudrun/scripts/<your-ocr-deploy-script>.sh
-```
-
-The script prints the OCR service URL.
-
-### Cloud Validation
-
-```bash
-curl "${OCR_SERVICE_URL}/v1/models"
-```
-
-### App Env for Cloud Inference
-
-Set these in your app `.env` after deployment:
-
-```bash
-PADDLEOCR_VL_SERVER_URL=${OCR_SERVICE_URL}/v1
-PADDLEOCR_VL_BACKEND=vllm-server
-PADDLEOCR_VL_API_MODEL_NAME=PaddlePaddle/PaddleOCR-VL-1.5
-```
-
-## Tests
-
-Run smoke tests:
-
-```bash
-uv run pytest
-```
-
-## Swapping Components
-
-- OCR engine: change `PADDLEOCR_VL_*` / `src/adapters/ocr_paddle_vl_server.py`
-- Embeddings: change `EMBEDDING_*` or replace `src/adapters/embedder_hf.py`.
-- Vector DB: implement `VectorStore` in a new adapter (e.g. Qdrant/Chroma).
-- Chat model: replace `src/adapters/chat_openai.py` with another `ChatService`.
+For script-specific notes, see `scripts/README.md`.
