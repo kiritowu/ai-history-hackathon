@@ -152,3 +152,10 @@ Common requirements:
 - `WEAVIATE_URL`
 - `WEAVIATE_API_KEY`
 - GCP credentials for `google-cloud-storage`
+
+## 👥 Team
+
+Built with 💜 by:
+
+- **Alex Chien** - [GitHub](https://github.com/Alexc09) | [LinkedIn](https://www.linkedin.com/in/alex-chien-09/)
+- **Wong Zhao Wu (Bryan)** - [GitHub](https://github.com/kiritowu) | [LinkedIn](https://www.linkedin.com/in/zw-wong/)
