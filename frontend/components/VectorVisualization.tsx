@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Sparkles } from "lucide-react"
+import { BookSearch } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import * as d3 from "d3"
 
@@ -202,8 +202,8 @@ export function VectorVisualization() {
           <div className="flex flex-row items-start justify-between gap-3">
             <div>
               <div className="mb-1 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-purple-500" />
-                <h2 className="text-xl font-semibold">Semantic Network</h2>
+                <BookSearch className="h-5 w-5 text-purple-500" />
+                <h2 className="text-xl font-semibold">Kratoska Map</h2>
               </div>
               <p className="text-sm text-muted-foreground">
                 Explore relationships across documents.

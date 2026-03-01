@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
-import { FileText, Loader2, Sparkles } from "lucide-react"
+import { BookSearch, FileText, Loader2 } from "lucide-react"
 
 import {
   Conversation,
@@ -29,12 +29,9 @@ import { Suggestion, Suggestions } from "@/components/ai/suggestion"
 import { useRightPanel, type RetrievedSource } from "@/components/RightPanel"
 
 const defaultSuggestions = [
-  "How did Singapore become a major trading port?",
-  "What role did the East India Company play in Singapore's trade?",
-  "What were Singapore's key commodities in the 19th century?",
-  "How did the rubber and tin trade shape Singapore's economy?",
-  "What was the impact of the Suez Canal on Singapore's trade routes?",
-  "How did entrepôt trade define Singapore's early growth?",
+  "What drove petitions in the Straits Settlements?",
+  "How did the government finance World War II?",
+  "Why was tin crucial to Malaya's survival?",
 ]
 
 interface ChatInterfaceProps {
@@ -201,8 +198,8 @@ export function ChatInterface({ onConversationStart }: ChatInterfaceProps) {
       {/* Header */}
       <div className="shrink-0 border-b border-border px-6 py-4">
         <div className="mb-1 flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-purple-500" />
-          <h2 className="text-xl font-semibold">AI Research Assistant</h2>
+          <BookSearch className="h-5 w-5 text-purple-500" />
+          <h2 className="text-xl font-semibold">Straits Cipher</h2>
         </div>
         <p className="text-sm text-muted-foreground">
           Ask questions about AI history and get cited answers.
