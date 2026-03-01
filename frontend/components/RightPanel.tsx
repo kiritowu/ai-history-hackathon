@@ -1,8 +1,16 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useMemo } from "react"
-import { BookOpen, PanelRight } from "lucide-react"
+import { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from "react"
+import { BookOpen, ChevronDown, Maximize2, PanelRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 export interface RetrievedSource {
   id: string
@@ -82,6 +90,18 @@ export function RightPanelTrigger() {
 export function RightPanelContent() {
   const { open, sources, selectedSourceId, selectSource } = useRightPanel()
   const selectedSource = sources.find((s) => s.id === selectedSourceId) ?? null
+  const groupedSourcesRef = useRef<HTMLDivElement | null>(null)
+  const [showGroupedSourcesScrollHint, setShowGroupedSourcesScrollHint] = useState(false)
+
+  const updateGroupedSourcesScrollHint = useCallback(() => {
+    const el = groupedSourcesRef.current
+    if (!el) {
+      setShowGroupedSourcesScrollHint(false)
+      return
+    }
+    const remainingScroll = el.scrollHeight - el.scrollTop - el.clientHeight
+    setShowGroupedSourcesScrollHint(remainingScroll > 8)
+  }, [])
   const groupedSources = useMemo(() => {
     const groups = new Map<string, RetrievedSource[]>()
 
@@ -109,12 +129,32 @@ export function RightPanelContent() {
       .sort((a, b) => b.maxScore - a.maxScore)
   }, [sources])
 
+  useEffect(() => {
+    const el = groupedSourcesRef.current
+    if (!el) return
+
+    updateGroupedSourcesScrollHint()
+
+    const handleScroll = () => updateGroupedSourcesScrollHint()
+    el.addEventListener("scroll", handleScroll)
+    window.addEventListener("resize", handleScroll)
+
+    const resizeObserver = new ResizeObserver(handleScroll)
+    resizeObserver.observe(el)
+
+    return () => {
+      el.removeEventListener("scroll", handleScroll)
+      window.removeEventListener("resize", handleScroll)
+      resizeObserver.disconnect()
+    }
+  }, [groupedSources, open, updateGroupedSourcesScrollHint])
+
   return (
     <div
       className="shrink-0 transition-[width] duration-200 ease-linear overflow-hidden"
-      style={{ width: open ? "20rem" : "0" }}
+      style={{ width: open ? "50%" : "0" }}
     >
-      <div className="flex h-full w-80 flex-col border-l border-border">
+      <div className="flex h-full w-full flex-col border-l border-border">
         <div className="shrink-0 border-b border-border px-4 py-3">
           <h2 className="text-lg font-semibold">Sources & Context</h2>
         </div>
@@ -130,41 +170,116 @@ export function RightPanelContent() {
             </div>
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
-            <div className="space-y-2">
-              {groupedSources.map((group) => (
-                <div key={group.documentName} className="rounded-md border border-border p-3">
-                  <p className="text-sm font-medium">{group.documentName}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {group.items.length} pages · Top relevance: {Math.round(group.maxScore * 100)}%
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {group.items.map((source) => (
-                      <button
-                        key={source.id}
-                        type="button"
-                        onClick={() => selectSource(source.id)}
-                        className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                          source.id === selectedSourceId
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border hover:bg-muted/50"
-                        }`}
-                      >
-                        {source.pageNumber ? `p.${source.pageNumber}` : `#${source.index}`} ·{" "}
-                        {Math.round((source.score ?? 0) * 100)}%
-                      </button>
-                    ))}
+          <div className="min-h-0 flex flex-1 flex-col gap-2 overflow-hidden p-3">
+            <div className="relative min-h-0 shrink-0 basis-1/2">
+              <div ref={groupedSourcesRef} className="h-full space-y-1 overflow-y-auto pr-1">
+                {groupedSources.map((group) => (
+                  <div key={group.documentName} className="rounded-md border border-border p-3">
+                    <p className="text-sm font-medium">{group.documentName}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {group.items.length} pages · Top relevance: {Math.round(group.maxScore * 100)}%
+                    </p>
+                    <div className="mt-3 flex max-h-[200px] flex-wrap gap-2 overflow-y-auto pr-1">
+                      {group.items.map((source) => (
+                        <button
+                          key={source.id}
+                          type="button"
+                          onClick={() => selectSource(source.id)}
+                          className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                            source.id === selectedSourceId
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border hover:bg-muted/50"
+                          }`}
+                        >
+                          {source.pageNumber ? `p.${source.pageNumber}` : `#${source.index}`} ·{" "}
+                          {Math.round((source.score ?? 0) * 100)}%
+                        </button>
+                      ))}
+                    </div>
                   </div>
+                ))}
+              </div>
+              {showGroupedSourcesScrollHint && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-6 items-end justify-center rounded-b-md bg-gradient-to-t from-muted/80 to-transparent pb-1">
+                  <ChevronDown className="h-4 w-4 animate-bounce text-muted-foreground" />
                 </div>
-              ))}
+              )}
             </div>
 
             {selectedSource && (
-              <div className="rounded-md border border-border p-3">
-                <p className="text-sm font-semibold mb-2">Selected source content</p>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {selectedSource.content}
+              <div className="min-h-0 flex flex-1 flex-col rounded-md border border-border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold">Selected source</p>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="h-7 w-7"
+                        aria-label="Open selected source in overlay"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="h-[85vh] w-[95vw] max-w-6xl p-4 sm:p-6">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {selectedSource.documentName}
+                          {selectedSource.pageNumber ? ` · Page ${selectedSource.pageNumber}` : ""}
+                        </DialogTitle>
+                        <DialogDescription>
+                          Expanded view of selected source text and page image.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
+                        <div className="min-h-0 rounded-md border border-border p-4">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Text
+                          </p>
+                          <p className="mt-3 h-[calc(85vh-13rem)] overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
+                            {selectedSource.content}
+                          </p>
+                        </div>
+                        <div className="min-h-0 rounded-md border border-dashed border-border p-4">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            Image
+                          </p>
+                          <div className="mt-3 flex h-[calc(85vh-13rem)] items-center justify-center rounded-md bg-muted/30">
+                            <p className="text-sm text-muted-foreground">
+                              Page image preview coming soon
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {selectedSource.documentName}
+                  {selectedSource.pageNumber ? ` · Page ${selectedSource.pageNumber}` : ""}
                 </p>
+
+                <div className="mt-3 grid min-h-0 flex-1 grid-cols-2 gap-3">
+                  <div className="min-h-0 rounded-md border border-border p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Text
+                    </p>
+                    <p className="mt-2 max-h-full overflow-y-auto whitespace-pre-wrap text-sm text-muted-foreground">
+                      {selectedSource.content}
+                    </p>
+                  </div>
+
+                  <div className="min-h-0 rounded-md border border-dashed border-border p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Image
+                    </p>
+                    <div className="mt-2 flex h-full min-h-0 items-center justify-center rounded-md bg-muted/30">
+                      <p className="text-xs text-muted-foreground">
+                        Page image preview coming soon
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
