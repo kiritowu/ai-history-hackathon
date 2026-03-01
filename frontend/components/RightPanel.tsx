@@ -325,7 +325,7 @@ export function RightPanelContent() {
       className="shrink-0 transition-[width] duration-200 ease-linear overflow-hidden"
       style={{ width: open ? "50%" : "0" }}
     >
-      <div className="flex h-full w-full flex-col border-l border-border">
+      <div className="flex h-full min-h-0 w-full flex-col border-l border-border">
         <div className="shrink-0 border-b border-border px-4 py-3">
           <h2 className="text-lg font-semibold">Sources & Context</h2>
         </div>
@@ -342,8 +342,8 @@ export function RightPanelContent() {
           </div>
         ) : (
           <div className="min-h-0 flex flex-1 flex-col gap-2 overflow-hidden p-3">
-            <div className="relative min-h-0 shrink-0 max-basis-1/2">
-              <div ref={groupedSourcesRef} className="h-full space-y-1 overflow-y-auto pr-1">
+            <div className="relative min-h-0 basis-1/2 overflow-hidden">
+              <div ref={groupedSourcesRef} className="h-full min-h-0 space-y-1 overflow-y-auto pr-1">
                 {groupedSources.map((group) => (
                   <div key={group.documentName} className="rounded-md border border-border p-3">
                     <p className="text-sm font-medium">{group.documentName}</p>
