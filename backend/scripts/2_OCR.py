@@ -140,21 +140,22 @@ async def ocr_all_to_file(
 
 for f in PREPROCESSED_DIR.glob("*.pkl"):
     name = f.name.replace(".pdf.pkl", "")
-    if name in processed_items:
-        print(f"Already processed {name}. Skipping...")
-        continue
+    print(name)
+    # if name in processed_items:
+    #     print(f"Already processed {name}. Skipping...")
+    #     continue
 
-    with open(f, "rb") as file:
-        page_urls = pickle.load(file)
-        print(f"Extracting text for {name}")
-        asyncio.run(
-            ocr_all_to_file(
-                page_urls,
-                output_path=f"{name}.txt",
-                max_concurrency=64,
-            )
-        )
+    # with open(f, "rb") as file:
+    #     page_urls = pickle.load(file)
+    #     print(f"Extracting text for {name}")
+    #     asyncio.run(
+    #         ocr_all_to_file(
+    #             page_urls,
+    #             output_path=f"{name}.txt",
+    #             max_concurrency=64,
+    #         )
+    #     )
 
-    # Track which docs have been OCRd
-    with open(processed_text_filename, "a", encoding="utf-8") as outfile:
-        outfile.write(name + "\n")
+    # # Track which docs have been OCRd
+    # with open(processed_text_filename, "a", encoding="utf-8") as outfile:
+    #     outfile.write(name + "\n")
