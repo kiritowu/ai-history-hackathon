@@ -47,8 +47,8 @@ CHOSEN = CONFIGS["GLM-OCR"]
     image=vllm_image,
     gpu=f"{CHOSEN['GPU']}:{CHOSEN['N_GPU']}",
     scaledown_window=1800,  # If no requests in 5 mins, shut down the server
-    timeout=300,  # If the container's execution time exceeds 5 mins,  exit..
-    # startup_timeout=600,  # If container doesn't start up in 10 mins, don't run it...
+    timeout=15,  # If the container's execution time exceeds ,  exit..
+    # startup_timeout=400,  # If container doesn't start up in 5 mins, don't run it...
     volumes={
         "/root/.cache/huggingface": hf_cache_vol,
         "/root/.cache/vllm": vllm_cache_vol,

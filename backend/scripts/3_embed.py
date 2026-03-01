@@ -44,10 +44,13 @@ embedder = Embedder("openai:text-embedding-3-large")
 
 PageItem = tuple[str, int, str]
 
-# Embed 32 documents at once
-EMBED_BATCH_SIZE = 32
+# Embed EMBED_BATCH_SIZE documents at once
+EMBED_BATCH_SIZE = 64
 EMBED_CONCURRENCY = 3  # fewer concurrent batches
 INSERT_CONCURRENCY = 16
+
+
+FAILED_COUNT = 0
 
 embed_sem = asyncio.Semaphore(EMBED_CONCURRENCY)
 insert_sem = asyncio.Semaphore(INSERT_CONCURRENCY)
@@ -112,6 +115,7 @@ async def insert_one(
 
 
 async def embed_and_upload_batched(
+    filename: str,
     embedder: Any,
     vector_store: Any,
     ALL_PAGES: List[PageItem],
@@ -120,11 +124,12 @@ async def embed_and_upload_batched(
     embed_concurrency: int = EMBED_CONCURRENCY,
     insert_concurrency: int = INSERT_CONCURRENCY,
 ) -> List[Optional[str]]:
+    global FAILED_COUNT
     embed_sem = asyncio.Semaphore(embed_concurrency)
     insert_sem = asyncio.Semaphore(insert_concurrency)
 
     total = len(ALL_PAGES)
-    print(f"Starting: {total} pages", flush=True)
+    print(f"Starting: {filename}, {total} pages", flush=True)
 
     results: List[Optional[str]] = []
     done = 0
@@ -132,7 +137,7 @@ async def embed_and_upload_batched(
     for bi, batch in enumerate(chunked(ALL_PAGES, embed_batch_size), start=1):
         retry_count = 0
 
-        texts = [text for (_source, _page_no, text) in batch]
+        texts = [text for (_source, _page_no, text) in batch if text != ""]
 
         print(f"[batch {bi}] embedding {len(texts)} docs...", flush=True)
 
@@ -142,8 +147,11 @@ async def embed_and_upload_batched(
                 break
             except ModelHTTPError as e:
                 print(repr(e))
+                print(texts)
                 retry_count += 1
         else:
+            # If failed, skip a batch
+            FAILED_COUNT += 1
             continue
 
         print(f"[batch {bi}] embedding done.", flush=True)
@@ -198,7 +206,7 @@ client = weaviate.connect_to_weaviate_cloud(
 )
 
 print(client.is_ready())  # Should print: `True`
-vector_store = client.collections.use("historyCollections")
+vector_store = client.collections.use("historyCollections2")
 
 
 for f in OCR_DIR.glob("*.txt"):
@@ -219,8 +227,11 @@ for f in OCR_DIR.glob("*.txt"):
         )
     ]
 
-    asyncio.run(embed_and_upload_batched(embedder, vector_store, result))
+    asyncio.run(embed_and_upload_batched(name, embedder, vector_store, result))
     with open(processed_text_filename, "a", encoding="utf-8") as outfile:
         outfile.write(name + "\n")
+
+
+print(f"Failed count: {FAILED_COUNT}")
 
 client.close()  # Free up resources

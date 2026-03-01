@@ -58,7 +58,7 @@ MODEL_NAME = "zai-org/GLM-OCR"
 
 url = f"{ENDPOINT}/v1"
 
-client = AsyncOpenAI(api_key=api_key, base_url=url, timeout=60)
+client = AsyncOpenAI(api_key=api_key, base_url=url, timeout=15)
 
 
 def build_messages(page_url: str):
@@ -75,8 +75,8 @@ def build_messages(page_url: str):
 
 async def ocr_one(idx: int, page_url: str, sem: asyncio.Semaphore):
     async with sem:
-        retry_count = 1
-        while retry_count < 3:
+        retry_count = 0
+        while retry_count < 2:
             try:
                 resp = await client.chat.completions.create(
                     model=MODEL_NAME,
@@ -85,6 +85,7 @@ async def ocr_one(idx: int, page_url: str, sem: asyncio.Semaphore):
                 )
                 break
             except Exception as e:
+                await asyncio.sleep(5)
                 print(repr(e))
                 retry_count += 1
         else:
@@ -94,10 +95,21 @@ async def ocr_one(idx: int, page_url: str, sem: asyncio.Semaphore):
         try:
             text = resp.choices[0].message.content
         except AttributeError as e:
+            print(repr(e))
             return idx, "[UNABLE TO SCRAPE]"
 
         # Run OCR cleaning using another model
-        resp = await cleaner_agent.run(f"OCR Text: {text}")
+        cleaner_retry_count = 0
+        while cleaner_retry_count < 3:
+            try:
+                resp = await cleaner_agent.run(f"OCR Text: {text}")
+                break
+            except Exception as e:
+                print(repr(e))
+                cleaner_retry_count += 1
+        else:
+            return idx, "[UNABLE TO SCRAPE]"
+
         text = resp.output.cleaned
 
         return idx, text
