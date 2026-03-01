@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { getDocumentClusters } from "@/lib/weaviate"
 
+const TARGET_CLUSTER_COUNT = 6
+
 // Simple cosine similarity function
 function cosineSimilarity(a: number[], b: number[]): number {
   const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0)
@@ -12,7 +14,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
 // K-means clustering
 function kMeansClustering(
   vectors: number[][],
-  k: number = 5
+  k: number = TARGET_CLUSTER_COUNT
 ): { clusters: number[][]; labels: number[] } {
   const labels = new Array(vectors.length).fill(0)
   const clusters: number[][] = []
@@ -81,7 +83,7 @@ export async function GET() {
     }
 
     // Cluster documents
-    const { labels } = kMeansClustering(vectors, Math.min(5, vectors.length))
+    const { labels } = kMeansClustering(vectors, Math.min(TARGET_CLUSTER_COUNT, vectors.length))
 
     // Create nodes
     const nodes = vectorizedDocuments.map((doc: any, i: number) => {

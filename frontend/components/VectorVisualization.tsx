@@ -107,6 +107,9 @@ export function VectorVisualization() {
           "#8b5cf6", // purple
           "#ec4899", // pink
           "#f59e0b", // amber
+          "#22c55e", // green
+          "#ef4444", // red
+          "#6366f1", // indigo
         ]
         return colors[d.group % colors.length]
       })
@@ -295,7 +298,14 @@ export function VectorVisualization() {
             <div>
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Summary</p>
               <div className="mt-1 text-sm leading-6 text-foreground/90 break-words">
-                <ReactMarkdown>
+                <ReactMarkdown
+                  components={{
+                    ul: ({ children }) => <ul className="list-disc space-y-1 pl-5">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal space-y-1 pl-5">{children}</ol>,
+                    li: ({ children }) => <li>{children}</li>,
+                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                  }}
+                >
                   {selectedNode.summary || "No summary available for this file yet."}
                 </ReactMarkdown>
               </div>
