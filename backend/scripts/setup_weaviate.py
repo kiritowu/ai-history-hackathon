@@ -21,7 +21,7 @@ client = weaviate.connect_to_weaviate_cloud(
 
 # Create the collection. Weaviate's autoschema feature will infer properties when importing.
 questions = client.collections.create(
-    "historyCollections2",
+    "historyCollections3",
     vector_config=wvc.config.Configure.Vectors.self_provided(),
     properties=[
         Property(name="source", data_type=DataType.TEXT),

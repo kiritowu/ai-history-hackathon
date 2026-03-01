@@ -13,6 +13,8 @@ import re
 
 load_dotenv(override=True)
 
+WEAVIATE_COLLECTION_NAME = "historyCollections3"
+
 processed_text_filename = "embed_processed.txt"
 
 with open(processed_text_filename, "r", encoding="utf-8") as f:
@@ -206,7 +208,7 @@ client = weaviate.connect_to_weaviate_cloud(
 )
 
 print(client.is_ready())  # Should print: `True`
-vector_store = client.collections.use("historyCollections2")
+vector_store = client.collections.use(WEAVIATE_COLLECTION_NAME)
 
 
 for f in OCR_DIR.glob("*.txt"):
