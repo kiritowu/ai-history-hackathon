@@ -1,35 +1,24 @@
-FROM node:20-alpine AS base
+FROM node:lts-alpine AS base
 
-ENV NEXT_TELEMETRY_DISABLED=1
-WORKDIR /app
-
+# Stage 1: Install dependencies
 FROM base AS deps
+WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-FROM base AS build
+# Stage 2: Build the application
+FROM base AS builder
+WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
-RUN mkdir -p public
-RUN npm prune --omit=dev
 
-FROM node:20-alpine AS runner
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=8080
-
+# Stage 3: Production server
+FROM base AS runner
 WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
-
-COPY --from=build /app/package.json ./package.json
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/.next ./.next
-COPY --from=build /app/public ./public
-COPY --from=build /app/next.config.js ./next.config.js
-
-USER nextjs
-EXPOSE 8080
-
-CMD ["sh", "-c", "npm run start -- -H 0.0.0.0 -p ${PORT:-8080}"]
+EXPOSE 3000
+CMD ["node", "server.js"]

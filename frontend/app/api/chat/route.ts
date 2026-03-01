@@ -31,7 +31,7 @@ export async function POST(request: Request) {
             "Run hybrid retrieval (keyword + vector) over indexed history documents and return the most relevant chunks.",
           inputSchema: z.object({
             query: z.string().describe("Search query to retrieve relevant chunks"),
-            topK: z.number().int().min(1).max(10).optional().default(10),
+            topK: z.number().int().min(1).max(50).optional().default(50),
             alpha: z.number().min(0).max(1).optional().describe("Hybrid weight for vector signal (0=keyword only, 1=vector only)"),
           }),
           execute: async ({ query, topK: toolTopK, alpha }) => {
