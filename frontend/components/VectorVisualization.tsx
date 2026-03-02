@@ -166,9 +166,6 @@ export function VectorVisualization() {
         .attr("y2", (d: any) => d.target.y)
 
       node.attr("cx", (d: any) => d.x).attr("cy", (d: any) => d.y)
-      node
-        .attr("stroke", (d: any) => (d.id === selectedNodeId ? "#111111" : "rgba(255, 255, 255, 0.3)"))
-        .attr("stroke-width", (d: any) => (d.id === selectedNodeId ? 2.5 : 1))
 
       labels.attr("x", (d: any) => d.x).attr("y", (d: any) => d.y)
     })
@@ -193,7 +190,15 @@ export function VectorVisualization() {
     return () => {
       simulation.stop()
     }
-  }, [data, selectedNodeId])
+  }, [data])
+
+  // Update node styling when selectedNodeId changes without recreating the graph
+  useEffect(() => {
+    const svg = d3.select(svgRef.current)
+    svg.selectAll("circle")
+      .attr("stroke", (d: any) => (d.id === selectedNodeId ? "#111111" : "rgba(255, 255, 255, 0.3)"))
+      .attr("stroke-width", (d: any) => (d.id === selectedNodeId ? 2.5 : 1))
+  }, [selectedNodeId])
 
   const selectedNode = data.nodes.find((node) => node.id === selectedNodeId) ?? null
 
